@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TF Trading — Futures Account Profit and Loss Details</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --page:#0B0E11; --card:#181A20; --card2:#1E2329; --bd:#2B3139;
+  --tx:#EAECEF; --tx2:#848E9C; --tx3:#5E6673;
+  --yl:#FCD535; --gr:#2EBD85; --rd:#F6465D; --bl:#1E90FF;
+}
+*{margin:0;padding:0;box-sizing:border-box;
+  font-family:'IBM Plex Sans','BinancePlex',-apple-system,'Segoe UI','Malgun Gothic',sans-serif}
+body{background:var(--page);color:var(--tx);font-size:14px;-webkit-font-smoothing:antialiased}
+button{cursor:pointer;border:none;font-family:inherit}
+input{font-family:inherit;outline:none}
+a{color:inherit;text-decoration:none}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-thumb{background:var(--bd);border-radius:3px}
+
+/* ---------- top nav ---------- */
+#nav{display:flex;align-items:center;gap:26px;height:56px;padding:0 22px;background:var(--card);position:sticky;top:0;z-index:50}
+#brand{display:flex;align-items:center;gap:8px;font-size:17px;font-weight:700;letter-spacing:.3px}
+#brand .dia{width:18px;height:18px;background:var(--yl);transform:rotate(45deg);border-radius:3px}
+#nav .nl{color:var(--tx);font-size:13.5px;font-weight:500;opacity:.92}
+#nav .nl:hover{color:var(--yl)}
+#navRight{margin-left:auto;display:flex;align-items:center;gap:14px}
+.depBtn{background:var(--yl);color:#181A20;font-weight:600;font-size:13px;padding:7px 14px;border-radius:6px}
+.icn{width:20px;height:20px;border-radius:50%;border:1.6px solid var(--tx2);display:inline-block}
+
+/* ---------- layout ---------- */
+#wrap{display:grid;grid-template-columns:230px 1fr}
+#side{padding:18px 10px;min-height:calc(100vh - 56px)}
+.sitem{display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:8px;color:var(--tx);font-size:14px}
+.sitem:hover{background:var(--card)}
+.sitem.on{background:var(--card);color:var(--yl)}
+.sq{width:15px;height:15px;border:1.6px solid currentColor;border-radius:3px;opacity:.75;flex:0 0 auto}
+.sitem .car{margin-left:auto;color:var(--tx2);font-size:11px}
+#content{padding:16px 34px 60px;max-width:1320px}
+
+.prev{display:inline-flex;align-items:center;gap:8px;color:var(--tx2);font-size:14px;margin:6px 0 22px}
+.prev:hover{color:var(--yl)}
+#head{display:flex;align-items:center;gap:14px;margin-bottom:26px;flex-wrap:wrap}
+h1{font-size:30px;font-weight:600;letter-spacing:-.2px;border-bottom:1px solid var(--tx3);padding-bottom:2px}
+.eye{width:17px;height:17px;border:1.6px solid var(--tx2);border-radius:50% 50% 50% 50%/60% 60% 40% 40%;position:relative}
+.eye::after{content:'';position:absolute;inset:5px 5px;background:var(--tx2);border-radius:50%}
+#shareBtn{margin-left:auto;background:var(--card2);color:var(--tx);font-size:13.5px;font-weight:500;padding:9px 16px;border-radius:8px;display:flex;align-items:center;gap:8px}
+#shareBtn:hover{background:#2b313a}
+
+.mtabs{display:flex;gap:32px;margin-bottom:16px}
+.mtab{color:var(--tx2);font-size:15px;font-weight:500;padding-bottom:9px;background:none}
+.mtab.on{color:var(--tx);border-bottom:3px solid var(--yl)}
+
+.panel{background:var(--card);border:1px solid #22262d;border-radius:16px;padding:26px 30px;margin-bottom:22px}
+
+/* ---------- section 1 : input ---------- */
+#inputPanel h2{font-size:19px;font-weight:600;margin-bottom:4px}
+.subt{color:var(--tx2);font-size:12.5px;margin-bottom:20px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:16px 20px}
+.fld label{display:block;color:var(--tx2);font-size:12px;margin-bottom:6px}
+.ibox{display:flex;align-items:center;background:var(--card2);border:1px solid transparent;border-radius:8px;transition:border-color .15s}
+.ibox:focus-within{border-color:var(--yl)}
+.ibox input{flex:1;min-width:0;background:none;border:none;color:var(--tx);font-size:14px;padding:11px 12px}
+.ibox .suf{color:var(--tx2);font-size:12px;padding-right:12px;white-space:nowrap}
+.ibox input[type=date]{color-scheme:dark}
+.acts{display:flex;gap:10px;margin-top:22px;flex-wrap:wrap}
+.btnY{background:var(--yl);color:#181A20;font-weight:600;font-size:14px;padding:11px 26px;border-radius:8px}
+.btnY:hover{filter:brightness(1.07)}
+.btnG{background:var(--card2);color:var(--tx);font-size:13.5px;padding:11px 18px;border-radius:8px}
+.btnG:hover{background:#2b313a}
+.warn{color:var(--yl);font-size:12.5px;margin-top:14px;display:none}
+
+/* ---------- summary cards ---------- */
+#sumCard{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+#sumCard .c .lab{color:var(--tx2);font-size:13px;margin-bottom:12px}
+#sumCard .c .lab.u{border-bottom:1px dotted var(--tx3);display:inline-block;padding-bottom:2px}
+#sumCard .c .pc{font-size:26px;font-weight:600;letter-spacing:-.3px}
+#sumCard .c .am{font-size:13px;margin-top:6px}
+
+/* ---------- range bar ---------- */
+#rangeBar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:26px}
+.rb{background:none;color:var(--tx2);font-size:14px;font-weight:500;padding:9px 26px;border-radius:8px}
+.rb.on{background:var(--card2);color:var(--tx)}
+#dateChip{display:flex;align-items:center;gap:12px;background:none;border:1px solid var(--bd);border-radius:8px;padding:8px 14px;font-size:13.5px;margin-left:8px}
+#dateChip .arw{color:var(--tx2)}
+#dateChip .cal{width:14px;height:14px;border:1.5px solid var(--tx2);border-radius:2px}
+
+h2.sec{font-size:19px;font-weight:600;margin-bottom:22px}
+.kv2{display:grid;grid-template-columns:1fr 1fr;gap:0 70px}
+.kv{display:flex;align-items:baseline;justify-content:space-between;padding:9px 0;font-size:13.5px}
+.kv .k{color:var(--tx);border-bottom:1px dotted var(--tx3);padding-bottom:1px}
+.kv .v{font-weight:500;text-align:right}
+
+/* ---------- charts ---------- */
+.ctabs{display:flex;gap:30px;border-bottom:1px solid #22262d;margin:34px 0 26px}
+.ctab{color:var(--tx2);font-size:15px;font-weight:600;padding-bottom:12px;background:none}
+.ctab.on{color:var(--tx);border-bottom:3px solid var(--yl);margin-bottom:-1px}
+.chartHead{display:flex;align-items:center;margin-bottom:6px}
+.chartHead h3{font-size:17px;font-weight:600}
+.chartBox{position:relative;width:100%;height:270px}
+.chartBox canvas{position:absolute;inset:0;width:100%;height:100%}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:34px;margin-top:34px}
+.legend{display:flex;gap:22px;justify-content:center;margin-top:8px;color:var(--tx2);font-size:11.5px}
+.legend i{display:inline-block;width:14px;height:2px;vertical-align:middle;margin-right:6px}
+#assetRow{display:grid;grid-template-columns:1fr 1fr;gap:34px;align-items:center}
+#donutWrap{display:flex;flex-direction:column;align-items:center;gap:20px}
+.dleg{display:flex;gap:44px;font-size:12.5px}
+.dleg .b{display:block;width:22px;height:5px;border-radius:3px;margin-bottom:7px}
+.foot{color:#6b7480;font-size:11.5px;line-height:1.7;margin-top:26px}
+
+@media(max-width:1000px){
+  #wrap{grid-template-columns:1fr}
+  #side{display:none}
+  #content{padding:14px 16px 50px}
+  h1{font-size:22px}
+  #sumCard{grid-template-columns:1fr 1fr;gap:22px 10px}
+  .kv2{grid-template-columns:1fr;gap:0}
+  .two,#assetRow{grid-template-columns:1fr;gap:26px}
+  #nav .nl{display:none}
+  .panel{padding:18px 16px;border-radius:12px}
+  .chartBox{height:230px}
+}
+</style>
+</head>
+<body>
+
+<div id="nav">
+  <div id="brand"><span class="dia"></span>TF TRADING</div>
+  <a class="nl">Buy Crypto</a><a class="nl">Markets</a><a class="nl">Trade ⌄</a>
+  <a class="nl">Futures ⌄</a><a class="nl">Earn ⌄</a><a class="nl">Square ⌄</a><a class="nl">More ⌄</a>
+  <div id="navRight">
+    <button class="depBtn">↓ Deposit</button>
+    <span class="icn"></span><span class="icn"></span><span class="icn"></span>
+  </div>
+</div>
+
+<div id="wrap">
+  <div id="side">
+    <div class="sitem"><span class="sq"></span>Dashboard</div>
+    <div class="sitem"><span class="sq"></span>Assets<span class="car">⌄</span></div>
+    <div class="sitem"><span class="sq"></span>Orders<span class="car">⌄</span></div>
+    <div class="sitem"><span class="sq"></span>Rewards Hub</div>
+    <div class="sitem"><span class="sq"></span>Referral</div>
+    <div class="sitem on"><span class="sq"></span>Account<span class="car">⌄</span></div>
+    <div class="sitem"><span class="sq"></span>Sub Accounts</div>
+    <div class="sitem"><span class="sq"></span>Settings</div>
+  </div>
+
+  <div id="content">
+    <div class="prev">‹ Previous</div>
+    <div id="head">
+      <h1>Futures Account Profit and Loss Details</h1>
+      <span class="eye"></span>
+      <button id="shareBtn">⤴ Share My PnL</button>
+    </div>
+
+    <!-- ============ SECTION 1 : INPUT ============ -->
+    <div class="panel" id="inputPanel">
+      <h2>① Input Panel</h2>
+      <div class="subt">Enter your figures below and press Generate. All amounts are in USD.</div>
+      <div class="grid">
+        <div class="fld"><label>Start Date</label><div class="ibox"><input type="date" id="iFrom"></div></div>
+        <div class="fld"><label>End Date</label><div class="ibox"><input type="date" id="iTo"></div></div>
+        <div class="fld"><label>Start Seed</label><div class="ibox"><input type="number" id="iStart" placeholder="0.00"><span class="suf">USD</span></div></div>
+        <div class="fld"><label>End Seed</label><div class="ibox"><input type="number" id="iEnd" placeholder="0.00"><span class="suf">USD</span></div></div>
+        <div class="fld"><label>Total Profit</label><div class="ibox"><input type="number" id="iProfit" placeholder="0.00"><span class="suf">USD</span></div></div>
+        <div class="fld"><label>Total Loss</label><div class="ibox"><input type="number" id="iLoss" placeholder="0.00"><span class="suf">USD</span></div></div>
+        <div class="fld"><label>Total Trades</label><div class="ibox"><input type="number" id="iTrades" placeholder="0"><span class="suf">trades</span></div></div>
+        <div class="fld"><label>Win Rate</label><div class="ibox"><input type="number" id="iWin" placeholder="0.0" step="0.1"><span class="suf">%</span></div></div>
+        <div class="fld"><label>Trading Volume <span style="opacity:.6">(optional)</span></label><div class="ibox"><input type="number" id="iVol" placeholder="auto"><span class="suf">USD</span></div></div>
+      </div>
+      <div class="acts">
+        <button class="btnY" id="genBtn">Generate</button>
+        <button class="btnG" id="autoEndBtn">Auto End Seed</button>
+        <button class="btnG" id="shuffleBtn">Reshuffle Chart</button>
+        <button class="btnG" id="hideBtn">Hide Input Panel</button>
+        <button class="btnG" id="resetBtn">Reset</button>
+      </div>
+      <div class="warn" id="warn"></div>
+    </div>
+
+    <!-- ============ SECTION 2 : RESULT ============ -->
+    <div id="result">
+      <div class="mtabs">
+        <button class="mtab on">USD⊗-M</button>
+        <button class="mtab">COIN-M</button>
+      </div>
+
+      <div class="panel" id="sumPanel">
+        <div id="sumCard">
+          <div class="c"><div class="lab">Today's PNL</div><div class="pc" id="s1p">-</div><div class="am" id="s1a">-</div></div>
+          <div class="c"><div class="lab">7D PNL</div><div class="pc" id="s7p">-</div><div class="am" id="s7a">-</div></div>
+          <div class="c"><div class="lab">30D PNL</div><div class="pc" id="s30p">-</div><div class="am" id="s30a">-</div></div>
+          <div class="c"><div class="lab u">Lifetime PNL</div><div class="pc" id="slp">-</div><div class="am" id="sla">USD</div></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div id="rangeBar">
+          <button class="rb" data-d="7">7D</button>
+          <button class="rb on" data-d="30">1M</button>
+          <button class="rb" data-d="90">3M</button>
+          <button class="rb" data-d="365">1Y</button>
+          <div id="dateChip"><span id="chipFrom">-</span><span class="arw">→</span><span id="chipTo">-</span><span class="cal"></span></div>
+        </div>
+
+        <h2 class="sec">Profit and Loss Analysis</h2>
+        <div class="kv2">
+          <div>
+            <div class="kv"><span class="k">Total Profit</span><span class="v" id="vProfit">-</span></div>
+            <div class="kv"><span class="k">Total Loss</span><span class="v" id="vLoss">-</span></div>
+            <div class="kv"><span class="k">Net Profit/Loss</span><span class="v" id="vNet">-</span></div>
+            <div class="kv"><span class="k">Trading Volume</span><span class="v" id="vVol">-</span></div>
+            <div class="kv"><span class="k">Win Rate</span><span class="v" id="vWin">-</span></div>
+            <div class="kv"><span class="k">Winning Days</span><span class="v" id="vWD">-</span></div>
+          </div>
+          <div>
+            <div class="kv"><span class="k">Losing Days</span><span class="v" id="vLD">-</span></div>
+            <div class="kv"><span class="k">Breakeven Days</span><span class="v" id="vBD">-</span></div>
+            <div class="kv"><span class="k">Average Profit</span><span class="v" id="vAP">-</span></div>
+            <div class="kv"><span class="k">Average Loss</span><span class="v" id="vAL">-</span></div>
+            <div class="kv"><span class="k">Profit/Loss Ratio</span><span class="v" id="vPL">-</span></div>
+            <div class="kv"><span class="k">Total Trades</span><span class="v" id="vTR">-</span></div>
+          </div>
+        </div>
+
+        <div class="ctabs">
+          <button class="ctab on">Overview</button>
+          <button class="ctab">Details</button>
+          <button class="ctab">Symbol Analysis</button>
+          <button class="ctab">Funding &amp; Transaction</button>
+        </div>
+
+        <div class="chartHead"><h3>Daily PNL</h3></div>
+        <div class="chartBox"><canvas id="cDaily"></canvas></div>
+
+        <div class="two">
+          <div>
+            <div class="chartHead"><h3>Cumulative PNL</h3></div>
+            <div class="chartBox"><canvas id="cCum"></canvas></div>
+          </div>
+          <div>
+            <div class="chartHead"><h3>Cumulative PNL %</h3></div>
+            <div class="chartBox"><canvas id="cPct"></canvas></div>
+            <div class="legend"><span><i style="background:#FCD535"></i>Cumulative PNL %</span><span><i style="background:#4A90D9"></i>Cum. BTCUSDT PERP Mark Price %</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div id="assetRow">
+          <div>
+            <div class="chartHead" style="margin-bottom:18px"><h3>Asset Summary</h3></div>
+            <div id="donutWrap">
+              <div class="chartBox" style="height:200px;width:200px;position:relative"><canvas id="cDonut"></canvas></div>
+              <div class="dleg">
+                <div><span class="b" style="background:#1E90FF"></span>USDT 99.99%</div>
+                <div><span class="b" style="background:#FCD535"></span>USDC 0.01%</div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="chartHead" style="margin-bottom:18px"><h3>Asset Value</h3></div>
+            <div class="chartBox"><canvas id="cAsset"></canvas></div>
+          </div>
+        </div>
+        <div class="foot">* Trading costs (i.e. commissions, funding and liquidation fees) are deducted from the P&amp;L calculation. Account level P&amp;L analysis includes transactional P&amp;L and fees, and unrealized exchange rate P&amp;L from holding assets, all valued on USD basis. Due to data complexity and exchange rate fluctuation, there may be a margin of error or delay. All data is for reference only. We are sorry for any inconvenience caused.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+const LS='tfPnlReport';
+const C={tx:'#EAECEF',tx2:'#848E9C',grid:'#2B3139',yl:'#FCD535',gr:'#2EBD85',rd:'#F6465D',bl:'#4A90D9'};
+
+/* ---------- helpers ---------- */
+const pad=n=>String(n).padStart(2,'0');
+const ymd=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+const md=s=>s.slice(5);
+function num(n,d){return (n==null||isNaN(n))?'-':n.toLocaleString('en-US',{minimumFractionDigits:d==null?2:d,maximumFractionDigits:d==null?2:d});}
+function usd(n){return num(n)+' USD';}
+function sgn(n){return n>=0?'+':'';}
+function col(n){return n>=0?C.gr:C.rd;}
+function cls(n){return n>=0?'gr':'rd';}
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}}
+
+/* ---------- state ---------- */
+let cfg=loadCfg(), daily=[], stats={};
+function loadCfg(){
+  try{const s=JSON.parse(localStorage.getItem(LS));if(s&&s.from)return s;}catch(e){}
+  const to=new Date(), from=new Date(Date.now()-29*864e5);
+  return {from:ymd(from),to:ymd(to),start:669971,end:720218,profit:62800,loss:12553,trades:4,win:75,vol:null,seed:7,hide:false};
+}
+function saveCfg(){localStorage.setItem(LS,JSON.stringify(cfg));}
+function fillInputs(){
+  $('iFrom').value=cfg.from;$('iTo').value=cfg.to;
+  $('iStart').value=cfg.start;$('iEnd').value=cfg.end;
+  $('iProfit').value=cfg.profit;$('iLoss').value=cfg.loss;
+  $('iTrades').value=cfg.trades;$('iWin').value=cfg.win;
+  $('iVol').value=cfg.vol==null?'':cfg.vol;
+  $('inputPanel').style.display=cfg.hide?'none':'block';
+  $('hideBtn').textContent=cfg.hide?'Show Input Panel':'Hide Input Panel';
+}
+function readInputs(){
+  const g=(id,def)=>{const v=parseFloat($(id).value);return isNaN(v)?def:v;};
+  cfg.from=$('iFrom').value||cfg.from;
+  cfg.to=$('iTo').value||cfg.to;
+  cfg.start=g('iStart',0);cfg.end=g('iEnd',0);
+  cfg.profit=Math.abs(g('iProfit',0));cfg.loss=Math.abs(g('iLoss',0));
+  cfg.trades=Math.max(0,Math.round(g('iTrades',0)));
+  cfg.win=Math.min(100,Math.max(0,g('iWin',0)));
+  const v=parseFloat($('iVol').value);cfg.vol=isNaN(v)?null:v;
+  saveCfg();
+}
+
+/* ---------- generation ---------- */
+function dateList(a,b){
+  const out=[];let d=new Date(a+'T00:00:00'),e=new Date(b+'T00:00:00');
+  while(d<=e&&out.length<800){out.push(ymd(d));d=new Date(d.getTime()+864e5);}
+  return out.length?out:[a];
+}
+function split(total,n,rnd){
+  if(n<=0||total<=0)return [];
+  const w=Array.from({length:n},()=>0.35+rnd()*1.3);
+  const s=w.reduce((a,b)=>a+b,0);
+  return w.map(x=>total*x/s);
+}
+function build(){
+  const days=dateList(cfg.from,cfg.to);
+  const rnd=mulberry32(cfg.seed*7919+days.length);
+  const W=Math.round(cfg.trades*cfg.win/100), L=Math.max(0,cfg.trades-W);
+  const wA=split(cfg.profit,W,rnd), lA=split(cfg.loss,L,rnd);
+  const map={};
+  const pick=()=>days[Math.floor(rnd()*days.length)];
+  wA.forEach(v=>{const d=pick();map[d]=(map[d]||0)+v;});
+  lA.forEach(v=>{const d=pick();map[d]=(map[d]||0)-v;});
+  daily=days.map(d=>({d,v:+(map[d]||0).toFixed(2)}));
+
+  let cum=0;daily.forEach(x=>{cum+=x.v;x.cum=cum;x.eq=cfg.start+cum;});
+  const wd=daily.filter(x=>x.v>0).length, ld=daily.filter(x=>x.v<0).length;
+  const net=cfg.profit-cfg.loss;
+  const avgP=W>0?cfg.profit/W:0, avgL=L>0?cfg.loss/L:0;
+  const vol=cfg.vol!=null?cfg.vol:(cfg.profit+cfg.loss)*12;
+  const sum=n=>daily.slice(-n).reduce((a,b)=>a+b.v,0);
+  const base=cfg.start||1;
+  stats={days,W,L,wd,ld,bd:daily.length-wd-ld,net,avgP,avgL,vol,
+    ret:(cfg.end-cfg.start)/base*100,
+    d1:sum(1),d7:sum(7),d30:sum(30),
+    p1:sum(1)/base*100,p7:sum(7)/base*100,p30:sum(30)/base*100};
+  render();
+}
+
+/* ---------- render ---------- */
+function render(){
+  const st=stats;
+  $('s1p').textContent=sgn(st.d1)+num(st.p1)+'%';$('s1p').style.color=col(st.d1);
+  $('s1a').textContent=sgn(st.d1)+usd(st.d1);$('s1a').style.color=col(st.d1);
+  $('s7p').textContent=sgn(st.d7)+num(st.p7)+'%';$('s7p').style.color=col(st.d7);
+  $('s7a').textContent=sgn(st.d7)+usd(st.d7);$('s7a').style.color=col(st.d7);
+  $('s30p').textContent=sgn(st.d30)+num(st.p30)+'%';$('s30p').style.color=col(st.d30);
+  $('s30a').textContent=sgn(st.d30)+usd(st.d30);$('s30a').style.color=col(st.d30);
+  $('slp').textContent=sgn(st.net)+num(st.net);$('slp').style.color=col(st.net);
+  $('sla').textContent='USD';$('sla').style.color=col(st.net);
+
+  $('chipFrom').textContent=cfg.from;$('chipTo').textContent=cfg.to;
+  $('vProfit').textContent=usd(cfg.profit);$('vProfit').style.color=C.tx;
+  $('vLoss').textContent=usd(cfg.loss);
+  $('vNet').textContent=sgn(st.net)+usd(st.net);$('vNet').style.color=col(st.net);
+  $('vVol').textContent=num(st.vol);
+  $('vWin').textContent=num(cfg.win)+' %';
+  $('vWD').textContent=st.wd+' Days';
+  $('vLD').textContent=st.ld+' Days';
+  $('vBD').textContent=st.bd+' Days';
+  $('vAP').textContent=usd(st.avgP);
+  $('vAL').textContent=usd(st.avgL);
+  $('vPL').textContent=st.avgL>0?num(st.avgP/st.avgL):'-';
+  $('vTR').textContent=cfg.trades+' ('+st.W+'W / '+st.L+'L)';
+
+  const w=$('warn'), diff=(cfg.end-cfg.start)-st.net;
+  if(Math.abs(diff)>0.5){
+    w.style.display='block';
+    w.textContent=`Note: End Seed − Start Seed (${num(cfg.end-cfg.start)}) does not match Net Profit/Loss (${num(st.net)}). Difference ${num(diff)} USD. Press "Auto End Seed" to sync.`;
+  }else w.style.display='none';
+
+  drawAll();
+}
+
+/* ---------- chart utils ---------- */
+function prep(cv){
+  const r=cv.getBoundingClientRect();
+  const dpr=window.devicePixelRatio||1;
+  cv.width=Math.max(1,r.width*dpr);cv.height=Math.max(1,r.height*dpr);
+  const x=cv.getContext('2d');x.setTransform(dpr,0,0,dpr,0,0);
+  x.clearRect(0,0,r.width,r.height);
+  x.font="11px 'IBM Plex Sans',sans-serif";
+  return {x,W:r.width,H:r.height};
+}
+function niceTicks(lo,hi,n){
+  if(hi===lo){hi=lo+1;lo-=1;}
+  const raw=(hi-lo)/n, mag=Math.pow(10,Math.floor(Math.log10(raw)));
+  const step=[1,2,2.5,5,10].map(m=>m*mag).find(s=>s>=raw)||10*mag;
+  const s=Math.floor(lo/step)*step, e=Math.ceil(hi/step)*step;
+  const t=[];for(let v=s;v<=e+step/2;v+=step)t.push(+v.toFixed(6));
+  return t;
+}
+function axis(x,W,H,ticks,fmtV,padL,padR,padT,padB){
+  const lo=ticks[0],hi=ticks[ticks.length-1];
+  const y=v=>padT+(hi-v)/(hi-lo)*(H-padT-padB);
+  x.strokeStyle=C.grid;x.lineWidth=1;x.fillStyle=C.tx2;
+  ticks.forEach(v=>{
+    const yy=Math.round(y(v))+.5;
+    x.beginPath();x.moveTo(padL,yy);x.lineTo(W-padR,yy);x.stroke();
+    x.textAlign='right';x.fillText(fmtV(v),padL-8,yy+4);
+    x.textAlign='left';x.fillText(fmtV(v),W-padR+8,yy+4);
+  });
+  return y;
+}
+function xlabels(x,pts,px,H,padB,every){
+  x.fillStyle=C.tx2;x.textAlign='right';
+  pts.forEach((p,i)=>{
+    if(i%every)return;
+    x.save();x.translate(px(i)+4,H-padB+16);x.rotate(-Math.PI/4);
+    x.fillText(md(p.d),0,0);x.restore();
+  });
+}
+function drawDaily(){
+  const cv=$('cDaily');if(!cv)return;const{x,W,H}=prep(cv);
+  if(!daily.length)return;
+  const padL=58,padR=58,padT=14,padB=52;
+  const vs=daily.map(p=>p.v);
+  const ticks=niceTicks(Math.min(0,...vs),Math.max(0,...vs),4);
+  const y=axis(x,W,H,ticks,v=>num(v,0),padL,padR,padT,padB);
+  const n=daily.length, iw=(W-padL-padR)/n, bw=Math.max(2,Math.min(14,iw*0.55));
+  const px=i=>padL+iw*(i+0.5);
+  const y0=y(0);
+  x.strokeStyle=C.grid;x.beginPath();x.moveTo(padL,y0);x.lineTo(W-padR,y0);x.stroke();
+  daily.forEach((p,i)=>{
+    if(!p.v)return;
+    x.fillStyle=p.v>=0?C.gr:C.rd;
+    const yy=y(p.v);
+    x.fillRect(px(i)-bw/2,Math.min(yy,y0),bw,Math.max(1.5,Math.abs(yy-y0)));
+  });
+  xlabels(x,daily,px,H,padB,Math.max(1,Math.round(n/16)));
+}
+function drawLine(id,vals,color,fmtV,second){
+  const cv=$(id);if(!cv)return;const{x,W,H}=prep(cv);
+  if(!daily.length)return;
+  const padL=58,padR=58,padT=14,padB=52;
+  let all=vals.slice();if(second)all=all.concat(second);
+  const ticks=niceTicks(Math.min(0,...all),Math.max(0,...all),4);
+  const y=axis(x,W,H,ticks,fmtV,padL,padR,padT,padB);
+  const n=vals.length, px=i=>padL+(W-padL-padR)*(n<2?0.5:i/(n-1));
+  if(second){
+    x.strokeStyle=C.bl;x.lineWidth=1.4;x.beginPath();
+    second.forEach((v,i)=>i?x.lineTo(px(i),y(v)):x.moveTo(px(i),y(v)));x.stroke();
+  }
+  x.strokeStyle=color;x.lineWidth=1.8;x.beginPath();
+  vals.forEach((v,i)=>i?x.lineTo(px(i),y(v)):x.moveTo(px(i),y(v)));x.stroke();
+  xlabels(x,daily,px,H,padB,Math.max(1,Math.round(n/16)));
+}
+function drawDonut(){
+  const cv=$('cDonut');if(!cv)return;const{x,W,H}=prep(cv);
+  const cx=W/2,cy=H/2,r=Math.min(W,H)/2-6,ir=r*0.58;
+  const segs=[[0.9999,'#1E90FF'],[0.0001,'#FCD535']];
+  let a=-Math.PI/2;
+  segs.forEach(([p,c])=>{
+    const e=a+p*Math.PI*2;
+    x.beginPath();x.arc(cx,cy,r,a,e);x.arc(cx,cy,ir,e,a,true);x.closePath();
+    x.fillStyle=c;x.fill();a=e;
+  });
+}
+function drawAll(){
+  drawDaily();
+  drawLine('cCum',daily.map(p=>p.cum),C.yl,v=>num(v,0));
+  const base=cfg.start||1;
+  const pct=daily.map(p=>p.cum/base*100);
+  const rnd=mulberry32(cfg.seed*13+7);
+  let m=0;const mark=daily.map(()=>{m+=(rnd()-0.5)*1.4;return m;});
+  drawLine('cPct',pct,C.yl,v=>num(v,0)+'%',mark);
+  drawLine('cAsset',daily.map(p=>p.eq),C.yl,v=>num(v,0));
+  drawDonut();
+}
+
+/* ---------- events ---------- */
+$('genBtn').onclick=()=>{readInputs();build();};
+$('autoEndBtn').onclick=()=>{
+  readInputs();
+  cfg.end=+(cfg.start+cfg.profit-cfg.loss).toFixed(2);
+  $('iEnd').value=cfg.end;saveCfg();build();
+};
+$('shuffleBtn').onclick=()=>{readInputs();cfg.seed=Math.floor(Math.random()*1e6);saveCfg();build();};
+$('hideBtn').onclick=()=>{cfg.hide=!cfg.hide;saveCfg();fillInputs();};
+$('resetBtn').onclick=()=>{
+  if(!confirm('Reset all inputs?'))return;
+  localStorage.removeItem(LS);cfg=loadCfg();fillInputs();build();
+};
+document.querySelectorAll('.rb').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.rb').forEach(o=>o.classList.toggle('on',o===b));
+  const d=+b.dataset.d, to=new Date();
+  cfg.to=ymd(to);cfg.from=ymd(new Date(to.getTime()-(d-1)*864e5));
+  $('iFrom').value=cfg.from;$('iTo').value=cfg.to;saveCfg();build();
+});
+document.querySelectorAll('.mtab,.ctab').forEach(b=>b.onclick=()=>{
+  const g=b.classList.contains('mtab')?'.mtab':'.ctab';
+  document.querySelectorAll(g).forEach(o=>o.classList.toggle('on',o===b));
+});
+$('shareBtn').onclick=()=>{
+  cfg.hide=true;saveCfg();fillInputs();
+  window.scrollTo({top:0,behavior:'smooth'});
+};
+let rt;window.addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(drawAll,150);});
+
+fillInputs();build();
+</script>
+</body>
+</html>
