@@ -58,6 +58,7 @@ input,select{font-family:inherit;outline:none}
 
 /* Bottom tabs */
 #bottom{border-top:1px solid var(--border);height:240px;display:flex;flex-direction:column}
+#bottom.tall{height:520px}
 #btabs{display:flex;gap:2px;padding:0 10px;border-bottom:1px solid var(--border)}
 .btab{background:transparent;color:var(--text2);padding:10px 14px;font-size:13px;border-bottom:2px solid transparent}
 .btab.active{color:var(--yellow);border-bottom-color:var(--yellow)}
@@ -125,6 +126,27 @@ input[type=range]{width:100%;accent-color:var(--yellow)}
 
 @media(max-width:1100px){#main{grid-template-columns:180px 1fr 260px}}
 
+/* PnL Analysis */
+#pnlWrap{padding:12px}
+.pnlBar{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;padding:10px 12px;background:var(--bg2);border-radius:8px;margin-bottom:12px}
+.pnlF{display:flex;flex-direction:column;gap:4px}
+.pnlF label{color:var(--text2);font-size:10px;text-transform:uppercase;letter-spacing:.4px}
+.pnlF input,.pnlF select{background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:6px 8px;font-size:12px}
+.pnlF input:focus{border-color:var(--yellow)}
+.pnlF input[type=date]{color-scheme:dark}
+.pnlF input.num{width:120px;text-align:right}
+.qbtns{display:flex;gap:5px}
+.qbtn{background:var(--bg3);color:var(--text2);padding:6px 10px;border-radius:4px;font-size:11px}
+.qbtn:hover{color:var(--yellow)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:10px;margin-bottom:14px}
+.card{background:var(--bg2);border-radius:8px;padding:12px 14px}
+.card .lab{color:var(--text2);font-size:10px;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px}
+.card .big{font-size:19px;font-weight:700}
+.card .sub{color:var(--text2);font-size:11px;margin-top:3px}
+#eqChartWrap{background:var(--bg2);border-radius:8px;padding:10px;margin-bottom:14px;height:190px;position:relative}
+#eqChart{position:absolute;inset:10px;width:calc(100% - 20px);height:calc(100% - 20px)}
+.secTitle{color:var(--text2);font-size:11px;text-transform:uppercase;letter-spacing:.5px;margin:0 0 8px 2px}
+
 /* ===== Mobile ===== */
 @media(max-width:900px){
   body{overflow-y:auto}
@@ -143,8 +165,11 @@ input[type=range]{width:100%;accent-color:var(--yellow)}
   #shSym,#shPrice{font-size:15px}
   #chartWrap{height:300px;min-height:300px;flex:none}
   #orderPanel{border-top:1px solid var(--border)}
-  #bottom{height:auto}
+  #bottom,#bottom.tall{height:auto}
   #btabs{overflow-x:auto}
+  #btContent{max-height:none}
+  .pnlBar{gap:10px}
+  .pnlF input.num{width:110px}
   .btab{flex:0 0 auto;padding:10px 10px;font-size:12px}
   #btContent{overflow-x:auto;max-height:300px}
   #btContent table{min-width:640px}
@@ -192,6 +217,7 @@ input[type=range]{width:100%;accent-color:var(--yellow)}
         <button class="btab" data-bt="orders">Open Orders</button>
         <button class="btab" data-bt="history">Trade History</button>
         <button class="btab" data-bt="accounts">Accounts</button>
+        <button class="btab" data-bt="pnl">PnL Analysis</button>
       </div>
       <div id="btContent"></div>
     </div>
@@ -350,7 +376,7 @@ function onTick(sym,price){
       const hit=p.side==='long'?price<=liq:price>=liq;
       if(hit){
         a.positions.splice(i,1);
-        a.history.unshift({time:now(),type:'Liquidation',symbol:p.symbol,side:p.side==='long'?'Long':'Short',qty:p.qty,price:liq,fee:0,pnl:-p.margin});
+        a.history.unshift({ts:Date.now(),time:now(),type:'Liquidation',symbol:p.symbol,side:p.side==='long'?'Long':'Short',qty:p.qty,price:liq,fee:0,pnl:-p.margin});
         if(a.id===acct().id)toast(`⚠ ${p.symbol} ${p.side} position liquidated (margin lost)`,'err');
         changed=true;
       }
@@ -391,14 +417,14 @@ function execSpotBuy(a,sym,usdtAmt,price,silent){
   const fee=usdtAmt*SPOT_FEE, qty=(usdtAmt-fee)/price;
   a.usdt-=usdtAmt;
   const b=base(sym);a.spot[b]=(a.spot[b]||0)+qty;
-  a.history.unshift({time:now(),type:'Spot Buy',symbol:sym,side:'Buy',qty,price,fee,pnl:null});
+  a.history.unshift({ts:Date.now(),time:now(),type:'Spot Buy',symbol:sym,side:'Buy',qty,price,fee,pnl:null});
   if(!silent)toast(`✓ Bought ${fq(qty)} ${b} @ ${fp(sym,price)}`,'ok');
 }
 function execSpotSell(a,sym,qty,price,silent){
   const gross=qty*price, fee=gross*SPOT_FEE;
   const b=base(sym);a.spot[b]-=qty;if(a.spot[b]<1e-9)delete a.spot[b];
   a.usdt+=gross-fee;
-  a.history.unshift({time:now(),type:'Spot Sell',symbol:sym,side:'Sell',qty,price,fee,pnl:null});
+  a.history.unshift({ts:Date.now(),time:now(),type:'Spot Sell',symbol:sym,side:'Sell',qty,price,fee,pnl:null});
   if(!silent)toast(`✓ Sold ${fq(qty)} ${b} @ ${fp(sym,price)}`,'ok');
 }
 function execFutOpen(a,sym,side,margin,lev,price,silent){
@@ -413,7 +439,7 @@ function execFutOpen(a,sym,side,margin,lev,price,silent){
   }else{
     a.positions.push({symbol:sym,side,qty,entry:price,lev,margin});
   }
-  a.history.unshift({time:now(),type:'Open Position',symbol:sym,side:side==='long'?'Long':'Short',qty,price,fee,pnl:null});
+  a.history.unshift({ts:Date.now(),time:now(),type:'Open Position',symbol:sym,side:side==='long'?'Long':'Short',qty,price,fee,pnl:null});
   if(!silent)toast(`✓ Opened ${side} ${lev}x ${sym} @ ${fp(sym,price)}`,'ok');
 }
 function execFutClose(a,idx){
@@ -421,7 +447,7 @@ function execFutClose(a,idx){
   const pnl=posPnl(p), fee=p.qty*price*FUT_FEE;
   a.usdt+=p.margin+pnl-fee;
   a.positions.splice(idx,1);
-  a.history.unshift({time:now(),type:'Close Position',symbol:p.symbol,side:p.side==='long'?'Long':'Short',qty:p.qty,price,fee,pnl:pnl-fee});
+  a.history.unshift({ts:Date.now(),time:now(),type:'Close Position',symbol:p.symbol,side:p.side==='long'?'Long':'Short',qty:p.qty,price,fee,pnl:pnl-fee});
   toast(`✓ ${p.symbol} closed — PnL ${pnl-fee>=0?'+':''}${fmt(pnl-fee,2)} USDT`,pnl-fee>=0?'ok':'err');
   save();renderAll();
 }
@@ -581,6 +607,7 @@ function renderAcctSelect(){
 }
 function renderBottom(){
   const a=acct(),el=$('btContent');
+  $('bottom').classList.toggle('tall',curBtab==='pnl');
   if(curBtab==='assets'){
     const rows=[['USDT',a.usdt,1,a.usdt]];
     for(const b in a.spot){const p=prices[b+'USDT']||0;rows.push([b,a.spot[b],p,a.spot[b]*p]);}
@@ -622,6 +649,7 @@ function renderBottom(){
         <td class="${pnl>=0?'up':'down'}">${pnl>=0?'+':''}${pct.toFixed(2)}%</td></tr>`;
       }).join('')+'</table>';
   }
+  else if(curBtab==='pnl'){renderPnl(el);}
   else{
     if(!a.history.length){el.innerHTML='<div class="empty">No trade history</div>';return;}
     el.innerHTML=`<table><tr><th>Time</th><th>Type</th><th>Symbol</th><th>Side</th><th>Qty</th><th>Price</th><th>Fee</th><th>Realized PnL</th></tr>`+
@@ -631,6 +659,163 @@ function renderBottom(){
       <td class="${h.pnl==null?'':(h.pnl>=0?'up':'down')}">${h.pnl==null?'-':(h.pnl>=0?'+':'')+fmt(h.pnl,2)}</td></tr>`).join('')+'</table>';
   }
 }
+/* ============ Futures PnL Analysis ============ */
+function ymd(d){const p=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());}
+function pnlCfg(){
+  if(!state.pnlCfg)state.pnlCfg={};
+  const a=acct();
+  if(!state.pnlCfg[a.id]){
+    const to=new Date(), from=new Date(Date.now()-29*86400e3);
+    state.pnlCfg[a.id]={from:ymd(from),to:ymd(to),ss:null,es:null};
+  }
+  return state.pnlCfg[a.id];
+}
+function setRangeDays(n){
+  const c=pnlCfg(), to=new Date(), from=new Date(Date.now()-(n-1)*86400e3);
+  c.from=ymd(from);c.to=ymd(to);save();renderBottom();
+}
+function applyPnl(){
+  const c=pnlCfg();
+  c.from=$('pFrom').value;c.to=$('pTo').value;
+  const ss=parseFloat($('pSS').value), es=parseFloat($('pES').value);
+  c.ss=isNaN(ss)?null:ss; c.es=isNaN(es)?null:es;
+  save();renderBottom();
+}
+function autoSeeds(){
+  const c=pnlCfg(), a=acct();
+  c.ss=a.seed; c.es=equity(a);
+  save();renderBottom();
+  toast('Seeds filled from account','ok');
+}
+function renderPnl(el){
+  const a=acct(), c=pnlCfg();
+  const t0=new Date(c.from+'T00:00:00').getTime();
+  const t1=new Date(c.to+'T23:59:59.999').getTime();
+  const inRange=a.history.filter(h=>h.ts!=null&&h.ts>=t0&&h.ts<=t1);
+  const closed=inRange.filter(h=>h.pnl!=null);
+  const noTs=a.history.some(h=>h.ts==null);
+
+  let profit=0,loss=0,wins=0,losses=0,fees=0,best=null,worst=null;
+  inRange.forEach(h=>fees+=h.fee||0);
+  closed.forEach(h=>{
+    if(h.pnl>=0){profit+=h.pnl;wins++;if(best==null||h.pnl>best.pnl)best=h;}
+    else{loss+=-h.pnl;losses++;if(worst==null||h.pnl<worst.pnl)worst=h;}
+  });
+  const net=profit-loss, nTr=wins+losses;
+  const winRate=nTr?wins/nTr*100:0;
+  const pf=loss>0?profit/loss:(profit>0?Infinity:0);
+  const avgW=wins?profit/wins:0, avgL=losses?loss/losses:0;
+
+  const ss=c.ss!=null?c.ss:a.seed, es=c.es!=null?c.es:equity(a);
+  const ret=ss>0?(es-ss)/ss*100:0, diff=es-ss;
+  const sign=v=>(v>=0?'+':'');
+  const cls=v=>v>=0?'up':'down';
+
+  // daily aggregation
+  const daily={};
+  closed.forEach(h=>{
+    const d=ymd(new Date(h.ts));
+    if(!daily[d])daily[d]={p:0,l:0,n:0};
+    if(h.pnl>=0)daily[d].p+=h.pnl;else daily[d].l+=-h.pnl;
+    daily[d].n++;
+  });
+  const days=Object.keys(daily).sort();
+  // equity curve (cumulative realized pnl on top of start seed)
+  const curve=[];let cum=ss;
+  days.forEach(d=>{cum+=daily[d].p-daily[d].l;curve.push({d,v:cum});});
+
+  el.innerHTML=`<div id="pnlWrap">
+    <div class="pnlBar">
+      <div class="pnlF"><label>From</label><input type="date" id="pFrom" value="${c.from}"></div>
+      <div class="pnlF"><label>To</label><input type="date" id="pTo" value="${c.to}"></div>
+      <div class="pnlF"><label>Quick Range</label>
+        <div class="qbtns">
+          <button class="qbtn" onclick="setRangeDays(7)">7D</button>
+          <button class="qbtn" onclick="setRangeDays(30)">1M</button>
+          <button class="qbtn" onclick="setRangeDays(90)">3M</button>
+        </div></div>
+      <div class="pnlF"><label>Start Seed (USDT)</label><input class="num" type="number" id="pSS" value="${ss.toFixed(2)}"></div>
+      <div class="pnlF"><label>End Seed (USDT)</label><input class="num" type="number" id="pES" value="${es.toFixed(2)}"></div>
+      <div class="pnlF"><label>&nbsp;</label><button class="ybtn" onclick="applyPnl()">Apply</button></div>
+      <div class="pnlF"><label>&nbsp;</label><button class="qbtn" onclick="autoSeeds()">Auto Fill</button></div>
+    </div>
+
+    <div class="cards">
+      <div class="card"><div class="lab">Return</div>
+        <div class="big ${cls(ret)}">${sign(ret)}${ret.toFixed(2)}%</div>
+        <div class="sub ${cls(diff)}">${sign(diff)}${fmt(diff,2)} USDT</div></div>
+      <div class="card"><div class="lab">Total Profit</div>
+        <div class="big up">+${fmt(profit,2)}</div>
+        <div class="sub">${wins} winning trades</div></div>
+      <div class="card"><div class="lab">Total Loss</div>
+        <div class="big down">-${fmt(loss,2)}</div>
+        <div class="sub">${losses} losing trades</div></div>
+      <div class="card"><div class="lab">Net Realized PnL</div>
+        <div class="big ${cls(net)}">${sign(net)}${fmt(net,2)}</div>
+        <div class="sub">${nTr} closed trades</div></div>
+      <div class="card"><div class="lab">Win Rate</div>
+        <div class="big">${winRate.toFixed(1)}%</div>
+        <div class="sub">${wins}W / ${losses}L</div></div>
+      <div class="card"><div class="lab">Profit Factor</div>
+        <div class="big">${pf===Infinity?'∞':pf.toFixed(2)}</div>
+        <div class="sub">Avg W ${fmt(avgW,2)} / Avg L ${fmt(avgL,2)}</div></div>
+      <div class="card"><div class="lab">Total Fees</div>
+        <div class="big">${fmt(fees,2)}</div>
+        <div class="sub">${inRange.length} transactions</div></div>
+      <div class="card"><div class="lab">Best / Worst Trade</div>
+        <div class="big" style="font-size:14px"><span class="up">${best?'+'+fmt(best.pnl,2):'-'}</span> / <span class="down">${worst?fmt(worst.pnl,2):'-'}</span></div>
+        <div class="sub">${best?best.symbol:''} ${worst?'/ '+worst.symbol:''}</div></div>
+    </div>
+
+    <div class="secTitle">Equity Curve (start seed + cumulative realized PnL)</div>
+    <div id="eqChartWrap"><canvas id="eqChart"></canvas></div>
+
+    <div class="secTitle">Daily Breakdown</div>
+    ${days.length?`<table><tr><th>Date</th><th>Trades</th><th>Profit</th><th>Loss</th><th>Net</th><th>Cumulative</th></tr>`+
+      days.map((d,i)=>{const x=daily[d],n=x.p-x.l;
+        return `<tr><td>${d}</td><td>${x.n}</td><td class="up">+${fmt(x.p,2)}</td><td class="down">-${fmt(x.l,2)}</td>
+        <td class="${cls(n)}">${sign(n)}${fmt(n,2)}</td><td>${fmt(curve[i].v,2)}</td></tr>`;}).join('')+'</table>'
+      :`<div class="empty">No closed futures trades in this period${noTs?' (records saved before this update have no date and are excluded)':''}</div>`}
+  </div>`;
+
+  drawEqChart(curve,ss);
+}
+function drawEqChart(curve,ss){
+  const cv=$('eqChart');if(!cv)return;
+  const wrap=$('eqChartWrap'),W=wrap.clientWidth-20,H=wrap.clientHeight-20;
+  if(W<=0||H<=0)return;
+  const dpr=window.devicePixelRatio||1;
+  cv.width=W*dpr;cv.height=H*dpr;
+  const ctx=cv.getContext('2d');ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,W,H);
+  const pts=[{d:'',v:ss}].concat(curve);
+  if(pts.length<2){ctx.fillStyle='#848E9C';ctx.font='12px sans-serif';ctx.textAlign='center';ctx.fillText('Not enough data to plot',W/2,H/2);return;}
+  let hi=Math.max(...pts.map(p=>p.v)),lo=Math.min(...pts.map(p=>p.v));
+  const rng=(hi-lo)||Math.abs(hi)*0.02||1;hi+=rng*.1;lo-=rng*.1;
+  const padR=62;
+  const x=i=>i/(pts.length-1)*(W-padR), y=v=>(hi-v)/(hi-lo)*(H-16)+4;
+  ctx.strokeStyle='#2B3139';ctx.fillStyle='#848E9C';ctx.font='10px sans-serif';ctx.textAlign='left';
+  for(let i=0;i<=4;i++){const v=hi-(hi-lo)*i/4,yy=y(v);
+    ctx.beginPath();ctx.moveTo(0,yy);ctx.lineTo(W-padR,yy);ctx.stroke();
+    ctx.fillText(fmt(v,2),W-padR+5,yy+3);}
+  // baseline (start seed)
+  ctx.strokeStyle='#848E9C';ctx.setLineDash([3,3]);
+  ctx.beginPath();ctx.moveTo(0,y(ss));ctx.lineTo(W-padR,y(ss));ctx.stroke();ctx.setLineDash([]);
+  const end=pts[pts.length-1].v, col=end>=ss?'#0ECB81':'#F6465D';
+  // area
+  const g=ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,col+'55');g.addColorStop(1,col+'00');
+  ctx.beginPath();ctx.moveTo(x(0),y(pts[0].v));
+  pts.forEach((p,i)=>ctx.lineTo(x(i),y(p.v)));
+  ctx.lineTo(x(pts.length-1),H);ctx.lineTo(0,H);ctx.closePath();
+  ctx.fillStyle=g;ctx.fill();
+  // line
+  ctx.beginPath();ctx.moveTo(x(0),y(pts[0].v));
+  pts.forEach((p,i)=>ctx.lineTo(x(i),y(p.v)));
+  ctx.strokeStyle=col;ctx.lineWidth=2;ctx.stroke();ctx.lineWidth=1;
+  ctx.fillStyle=col;ctx.beginPath();ctx.arc(x(pts.length-1),y(end),3.5,0,7);ctx.fill();
+}
+
 function renderOrderPanel(){
   const fut=curMkt==='futures';
   $('levRow').style.display=fut?'block':'none';
@@ -754,7 +939,7 @@ document.querySelectorAll('.ibtn').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('.ibtn').forEach(x=>x.classList.toggle('active',x===b));
   loadCandles();
 });
-window.addEventListener('resize',drawChart);
+window.addEventListener('resize',()=>{drawChart();if(curBtab==='pnl')renderBottom();});
 
 /* ============ Start ============ */
 renderMarkets();renderOrderPanel();renderAll();
