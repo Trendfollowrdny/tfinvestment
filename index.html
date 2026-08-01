@@ -14,6 +14,7 @@
 body{background:var(--bg);color:var(--text);font-size:13px;overflow-x:hidden}
 button{cursor:pointer;border:none;font-family:inherit}
 input,select{font-family:inherit;outline:none}
+a{text-decoration:none}
 ::-webkit-scrollbar{width:5px;height:5px}
 ::-webkit-scrollbar-thumb{background:var(--bg3);border-radius:3px}
 
@@ -23,8 +24,10 @@ input,select{font-family:inherit;outline:none}
 #logo span{font-weight:400;font-size:12px;margin-left:6px;color:var(--text2)}
 #acctArea{display:flex;align-items:center;gap:8px;margin-left:auto}
 #acctSelect{background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:5px 8px;font-size:13px}
-.tbtn{background:var(--bg3);color:var(--text);padding:6px 12px;border-radius:4px;font-size:12px}
+.tbtn{background:var(--bg3);color:var(--text);padding:6px 12px;border-radius:4px;font-size:12px;display:inline-block}
 .tbtn:hover{background:#3a4149}
+.tbtn.hl{background:transparent;color:var(--yellow);border:1px solid var(--yellow);font-weight:600}
+.tbtn.hl:hover{background:rgba(240,185,11,.12)}
 #equityBox{display:flex;gap:18px;align-items:center;background:var(--bg3);padding:5px 14px;border-radius:6px}
 #equityBox .lab{color:var(--text2);font-size:11px}
 #equityBox .val{font-size:14px;font-weight:600}
@@ -124,8 +127,6 @@ input[type=range]{width:100%;accent-color:var(--yellow)}
 .toast.ok{border-left-color:var(--green)}.toast.err{border-left-color:var(--red)}
 @keyframes slideIn{from{transform:translateX(40px);opacity:0}to{transform:none;opacity:1}}
 
-@media(max-width:1100px){#main{grid-template-columns:180px 1fr 260px}}
-
 /* PnL Analysis */
 #pnlWrap{padding:12px}
 .pnlBar{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;padding:10px 12px;background:var(--bg2);border-radius:8px;margin-bottom:12px}
@@ -147,6 +148,8 @@ input[type=range]{width:100%;accent-color:var(--yellow)}
 #eqChart{position:absolute;inset:10px;width:calc(100% - 20px);height:calc(100% - 20px)}
 .secTitle{color:var(--text2);font-size:11px;text-transform:uppercase;letter-spacing:.5px;margin:0 0 8px 2px}
 
+@media(max-width:1100px){#main{grid-template-columns:180px 1fr 260px}}
+
 /* ===== Mobile ===== */
 @media(max-width:900px){
   body{overflow-y:auto}
@@ -156,7 +159,6 @@ input[type=range]{width:100%;accent-color:var(--yellow)}
   #equityBox .val{font-size:12px}
   #main{display:block;height:auto}
   #main>div{overflow:visible}
-  /* market list → horizontal scroll chips */
   #marketList{display:flex;overflow-x:auto;border-bottom:1px solid var(--border);-webkit-overflow-scrolling:touch}
   #marketList .mkt{flex:0 0 auto;min-width:108px;display:block;text-align:center;border-bottom:2px solid transparent;padding:8px 10px}
   #marketList .mkt.active{border-left:none;border-bottom:2px solid var(--yellow)}
@@ -167,12 +169,11 @@ input[type=range]{width:100%;accent-color:var(--yellow)}
   #orderPanel{border-top:1px solid var(--border)}
   #bottom,#bottom.tall{height:auto}
   #btabs{overflow-x:auto}
-  #btContent{max-height:none}
+  .btab{flex:0 0 auto;padding:10px 10px;font-size:12px}
+  #btContent{overflow-x:auto;max-height:none}
+  #btContent table{min-width:640px}
   .pnlBar{gap:10px}
   .pnlF input.num{width:110px}
-  .btab{flex:0 0 auto;padding:10px 10px;font-size:12px}
-  #btContent{overflow-x:auto;max-height:300px}
-  #btContent table{min-width:640px}
   #modal{width:94vw}
   .acctRow{flex-wrap:wrap}
   .buyBtn,.sellBtn{padding:13px}
@@ -183,6 +184,7 @@ input[type=range]{width:100%;accent-color:var(--yellow)}
 
 <div id="topbar">
   <div id="logo">◆ TF TRADING<span>Algorithmic Trading</span></div>
+  <a class="tbtn hl" href="pnl.html">📊 PnL Report</a>
   <div id="acctArea">
     <div id="equityBox">
       <div><div class="lab">Initial Collateral</div><div class="val" id="eqSeed">-</div></div>
@@ -281,7 +283,7 @@ input[type=range]{width:100%;accent-color:var(--yellow)}
 const SYMBOLS=['BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT','DOGEUSDT','ADAUSDT','LINKUSDT','AVAXUSDT','SUIUSDT'];
 const INTERVALS=['1m','5m','15m','1h','4h','1d'];
 const IV_MS={'1m':60e3,'5m':300e3,'15m':900e3,'1h':3600e3,'4h':14400e3,'1d':86400e3};
-const SPOT_FEE=0.001, FUT_FEE=0.0004, MAINT=0.005; // fees 0.1% / 0.04%, maintenance margin 0.5%
+const SPOT_FEE=0.001, FUT_FEE=0.0004, MAINT=0.005;
 const LS_KEY='paperTradingV2';
 
 /* ============ State ============ */
@@ -307,7 +309,7 @@ function acct(){
 /* ============ Utils ============ */
 const $=id=>document.getElementById(id);
 function fmt(n,d){ if(n==null||isNaN(n))return'-';
-  if(d==null){ const a=Math.abs(n); d = a>=1000?2 : a>=1?2+ (a<10?2:0) : a>=0.01?6:8; if(a>=1000)return n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+  if(d==null){ const a=Math.abs(n); d = a>=1000?2 : a>=1?2 : a>=0.01?6:8; }
   return n.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
 }
 function fp(s,n){
@@ -377,7 +379,7 @@ function onTick(sym,price){
       if(hit){
         a.positions.splice(i,1);
         a.history.unshift({ts:Date.now(),time:now(),type:'Liquidation',symbol:p.symbol,side:p.side==='long'?'Long':'Short',qty:p.qty,price:liq,fee:0,pnl:-p.margin});
-        if(a.id===acct().id)toast(`⚠ ${p.symbol} ${p.side} position liquidated (margin lost)`,'err');
+        if(a.id===acct().id)toast('⚠ '+p.symbol+' '+p.side+' position liquidated (margin lost)','err');
         changed=true;
       }
     }
@@ -418,14 +420,14 @@ function execSpotBuy(a,sym,usdtAmt,price,silent){
   a.usdt-=usdtAmt;
   const b=base(sym);a.spot[b]=(a.spot[b]||0)+qty;
   a.history.unshift({ts:Date.now(),time:now(),type:'Spot Buy',symbol:sym,side:'Buy',qty,price,fee,pnl:null});
-  if(!silent)toast(`✓ Bought ${fq(qty)} ${b} @ ${fp(sym,price)}`,'ok');
+  if(!silent)toast('✓ Bought '+fq(qty)+' '+b+' @ '+fp(sym,price),'ok');
 }
 function execSpotSell(a,sym,qty,price,silent){
   const gross=qty*price, fee=gross*SPOT_FEE;
   const b=base(sym);a.spot[b]-=qty;if(a.spot[b]<1e-9)delete a.spot[b];
   a.usdt+=gross-fee;
   a.history.unshift({ts:Date.now(),time:now(),type:'Spot Sell',symbol:sym,side:'Sell',qty,price,fee,pnl:null});
-  if(!silent)toast(`✓ Sold ${fq(qty)} ${b} @ ${fp(sym,price)}`,'ok');
+  if(!silent)toast('✓ Sold '+fq(qty)+' '+b+' @ '+fp(sym,price),'ok');
 }
 function execFutOpen(a,sym,side,margin,lev,price,silent){
   const notional=margin*lev, qty=notional/price, fee=notional*FUT_FEE;
@@ -440,7 +442,7 @@ function execFutOpen(a,sym,side,margin,lev,price,silent){
     a.positions.push({symbol:sym,side,qty,entry:price,lev,margin});
   }
   a.history.unshift({ts:Date.now(),time:now(),type:'Open Position',symbol:sym,side:side==='long'?'Long':'Short',qty,price,fee,pnl:null});
-  if(!silent)toast(`✓ Opened ${side} ${lev}x ${sym} @ ${fp(sym,price)}`,'ok');
+  if(!silent)toast('✓ Opened '+side+' '+lev+'x '+sym+' @ '+fp(sym,price),'ok');
 }
 function execFutClose(a,idx){
   const p=a.positions[idx], price=prices[p.symbol]||p.entry;
@@ -448,7 +450,7 @@ function execFutClose(a,idx){
   a.usdt+=p.margin+pnl-fee;
   a.positions.splice(idx,1);
   a.history.unshift({ts:Date.now(),time:now(),type:'Close Position',symbol:p.symbol,side:p.side==='long'?'Long':'Short',qty:p.qty,price,fee,pnl:pnl-fee});
-  toast(`✓ ${p.symbol} closed — PnL ${pnl-fee>=0?'+':''}${fmt(pnl-fee,2)} USDT`,pnl-fee>=0?'ok':'err');
+  toast('✓ '+p.symbol+' closed — PnL '+(pnl-fee>=0?'+':'')+fmt(pnl-fee,2)+' USDT',pnl-fee>=0?'ok':'err');
   save();renderAll();
 }
 function fillOrder(a,o){
@@ -478,16 +480,16 @@ function placeOrder(side){
       if(isLimit){
         a.usdt-=amt;
         a.orders.push({id:Date.now(),mkt:'spot',symbol:sym,side:'buy',price:lp,qty:(amt*(1-SPOT_FEE))/lp,lock:amt,time:now()});
-        toast(`Limit buy order placed @ ${fp(sym,lp)}`,'ok');
+        toast('Limit buy order placed @ '+fp(sym,lp),'ok');
       }else execSpotBuy(a,sym,amt,price);
     }else{
       const b=base(sym), held=a.spot[b]||0;
       const qty=amt;
-      if(qty>held+1e-9){toast(`Insufficient ${b} (held: ${fq(held)})`,'err');return;}
+      if(qty>held+1e-9){toast('Insufficient '+b+' (held: '+fq(held)+')','err');return;}
       if(isLimit){
         a.spot[b]-=qty;if(a.spot[b]<1e-9)delete a.spot[b];
         a.orders.push({id:Date.now(),mkt:'spot',symbol:sym,side:'sell',price:lp,qty,lock:0,heldQty:qty,time:now()});
-        toast(`Limit sell order placed @ ${fp(sym,lp)}`,'ok');
+        toast('Limit sell order placed @ '+fp(sym,lp),'ok');
       }else execSpotSell(a,sym,qty,price);
     }
   }else{
@@ -498,7 +500,7 @@ function placeOrder(side){
     if(isLimit){
       a.usdt-=margin+fee;
       a.orders.push({id:Date.now(),mkt:'futures',symbol:sym,side:dir,price:lp,margin,lev,qty:notional/lp,lock:margin+fee,time:now()});
-      toast(`Limit ${dir} order placed @ ${fp(sym,lp)}`,'ok');
+      toast('Limit '+dir+' order placed @ '+fp(sym,lp),'ok');
     }else execFutOpen(a,sym,dir,margin,lev,price);
   }
   $('amt').value='';
@@ -519,7 +521,7 @@ function cancelOrder(id){
 async function loadCandles(){
   candles=[];drawChart();
   try{
-    const r=await fetch(`https://api.binance.com/api/v3/klines?symbol=${curSym}&interval=${curIv}&limit=150`);
+    const r=await fetch('https://api.binance.com/api/v3/klines?symbol='+curSym+'&interval='+curIv+'&limit=150');
     const arr=await r.json();
     candles=arr.map(k=>({t:k[0],o:+k[1],h:+k[2],l:+k[3],c:+k[4]}));
     drawChart();
@@ -531,7 +533,7 @@ function drawChart(){
   if(!W||!H)return;
   const dpr=window.devicePixelRatio||1;
   cv.width=W*dpr;cv.height=H*dpr;
-  const ctx=cv.getContext('2d');ctx.scale(dpr,dpr);
+  const ctx=cv.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);
   ctx.fillStyle='#181A20';ctx.fillRect(0,0,W,H);
   if(!candles.length){ctx.fillStyle='#848E9C';ctx.font='13px sans-serif';ctx.textAlign='center';ctx.fillText('Loading chart... (internet connection required)',W/2,H/2);return;}
   const padR=64,padB=20,cw=(W-padR)/candles.length;
@@ -567,11 +569,10 @@ function drawChart(){
 
 /* ============ Rendering ============ */
 function renderMarkets(){
-  $('marketList').innerHTML=SYMBOLS.map(s=>{
-    return `<div class="mkt ${s===curSym?'active':''}" data-s="${s}" id="mkt_${s}">
-      <div class="sym">${base(s)}<small>/USDT</small></div>
-      <div class="pr" id="mktp_${s}">-</div></div>`;
-  }).join('');
+  $('marketList').innerHTML=SYMBOLS.map(s=>
+    '<div class="mkt '+(s===curSym?'active':'')+'" data-s="'+s+'" id="mkt_'+s+'">'+
+    '<div class="sym">'+base(s)+'<small>/USDT</small></div>'+
+    '<div class="pr" id="mktp_'+s+'">-</div></div>').join('');
   document.querySelectorAll('.mkt').forEach(el=>el.onclick=()=>{selectSymbol(el.dataset.s);});
   SYMBOLS.forEach(renderMarketRow);
 }
@@ -579,7 +580,7 @@ function renderMarketRow(s){
   const el=$('mktp_'+s);if(!el)return;
   const t=tickers[s];if(!t)return;
   const chg=(t.c-t.o)/t.o*100;
-  el.innerHTML=`<div>${fp(s,t.c)}</div><div class="${chg>=0?'up':'down'}" style="font-size:11px">${chg>=0?'+':''}${chg.toFixed(2)}%</div>`;
+  el.innerHTML='<div>'+fp(s,t.c)+'</div><div class="'+(chg>=0?'up':'down')+'" style="font-size:11px">'+(chg>=0?'+':'')+chg.toFixed(2)+'%</div>';
 }
 function renderSymHeader(){
   $('shSym').textContent=base(curSym)+'/USDT';
@@ -599,11 +600,11 @@ function renderEquity(){
   const a=acct(),e=equity(a),pnl=e-a.seed,pct=a.seed?pnl/a.seed*100:0;
   $('eqSeed').textContent=fmt(a.seed,2)+' USDT';
   $('eqTotal').textContent=fmt(e,2)+' USDT';
-  $('eqPnl').innerHTML=`<span class="${pnl>=0?'up':'down'}">${pnl>=0?'+':''}${fmt(pnl,2)} (${pnl>=0?'+':''}${pct.toFixed(2)}%)</span>`;
+  $('eqPnl').innerHTML='<span class="'+(pnl>=0?'up':'down')+'">'+(pnl>=0?'+':'')+fmt(pnl,2)+' ('+(pnl>=0?'+':'')+pct.toFixed(2)+'%)</span>';
   $('availVal').textContent=fmt(a.usdt,2)+' USDT';
 }
 function renderAcctSelect(){
-  $('acctSelect').innerHTML=state.accounts.map(a=>`<option value="${a.id}" ${a.id===acct().id?'selected':''}>${a.name}</option>`).join('');
+  $('acctSelect').innerHTML=state.accounts.map(a=>'<option value="'+a.id+'" '+(a.id===acct().id?'selected':'')+'>'+a.name+'</option>').join('');
 }
 function renderBottom(){
   const a=acct(),el=$('btContent');
@@ -611,55 +612,57 @@ function renderBottom(){
   if(curBtab==='assets'){
     const rows=[['USDT',a.usdt,1,a.usdt]];
     for(const b in a.spot){const p=prices[b+'USDT']||0;rows.push([b,a.spot[b],p,a.spot[b]*p]);}
-    el.innerHTML=`<table><tr><th>Asset</th><th>Amount</th><th>Price</th><th>Value (USDT)</th></tr>`+
-      rows.map(r=>`<tr><td><b>${r[0]}</b></td><td>${fq(r[1])}</td><td>${r[0]==='USDT'?'-':fp(r[0]+'USDT',r[2])}</td><td>${fmt(r[3],2)}</td></tr>`).join('')+'</table>';
+    el.innerHTML='<table><tr><th>Asset</th><th>Amount</th><th>Price</th><th>Value (USDT)</th></tr>'+
+      rows.map(r=>'<tr><td><b>'+r[0]+'</b></td><td>'+fq(r[1])+'</td><td>'+(r[0]==='USDT'?'-':fp(r[0]+'USDT',r[2]))+'</td><td>'+fmt(r[3],2)+'</td></tr>').join('')+'</table>';
   }
   else if(curBtab==='positions'){
     if(!a.positions.length){el.innerHTML='<div class="empty">No open positions</div>';return;}
-    el.innerHTML=`<table><tr><th>Symbol</th><th>Side</th><th>Leverage</th><th>Size</th><th>Entry</th><th>Mark</th><th>Liq. Price</th><th>Margin</th><th>Unrealized PnL (ROE)</th><th></th></tr>`+
+    el.innerHTML='<table><tr><th>Symbol</th><th>Side</th><th>Leverage</th><th>Size</th><th>Entry</th><th>Mark</th><th>Liq. Price</th><th>Margin</th><th>Unrealized PnL (ROE)</th><th></th></tr>'+
       a.positions.map((p,i)=>{
         const pnl=posPnl(p),roe=pnl/p.margin*100,mark=prices[p.symbol]||p.entry;
-        return `<tr><td><b>${p.symbol}</b></td>
-        <td class="${p.side==='long'?'up':'down'}">${p.side==='long'?'Long':'Short'}</td>
-        <td>${p.lev.toFixed(0)}x</td><td>${fq(p.qty)}</td>
-        <td>${fp(p.symbol,p.entry)}</td><td>${fp(p.symbol,mark)}</td>
-        <td style="color:var(--yellow)">${fp(p.symbol,liqPrice(p))}</td>
-        <td>${fmt(p.margin,2)}</td>
-        <td class="${pnl>=0?'up':'down'}">${pnl>=0?'+':''}${fmt(pnl,2)} (${roe>=0?'+':''}${roe.toFixed(1)}%)</td>
-        <td><button class="xbtn" onclick="execFutClose(acct(),${i})">Close</button></td></tr>`;
+        return '<tr><td><b>'+p.symbol+'</b></td>'+
+        '<td class="'+(p.side==='long'?'up':'down')+'">'+(p.side==='long'?'Long':'Short')+'</td>'+
+        '<td>'+p.lev.toFixed(0)+'x</td><td>'+fq(p.qty)+'</td>'+
+        '<td>'+fp(p.symbol,p.entry)+'</td><td>'+fp(p.symbol,mark)+'</td>'+
+        '<td style="color:var(--yellow)">'+fp(p.symbol,liqPrice(p))+'</td>'+
+        '<td>'+fmt(p.margin,2)+'</td>'+
+        '<td class="'+(pnl>=0?'up':'down')+'">'+(pnl>=0?'+':'')+fmt(pnl,2)+' ('+(roe>=0?'+':'')+roe.toFixed(1)+'%)</td>'+
+        '<td><button class="xbtn" onclick="execFutClose(acct(),'+i+')">Close</button></td></tr>';
       }).join('')+'</table>';
   }
   else if(curBtab==='orders'){
     if(!a.orders.length){el.innerHTML='<div class="empty">No open orders</div>';return;}
-    el.innerHTML=`<table><tr><th>Time</th><th>Type</th><th>Symbol</th><th>Side</th><th>Limit Price</th><th>Qty</th><th></th></tr>`+
-      a.orders.map(o=>`<tr><td>${o.time}</td><td>${o.mkt==='spot'?'Spot':'Futures '+o.lev+'x'}</td><td><b>${o.symbol}</b></td>
-      <td class="${(o.side==='buy'||o.side==='long')?'up':'down'}">${{buy:'Buy',sell:'Sell',long:'Long',short:'Short'}[o.side]}</td>
-      <td>${fp(o.symbol,o.price)}</td><td>${fq(o.qty)}</td>
-      <td><button class="xbtn" onclick="cancelOrder(${o.id})">Cancel</button></td></tr>`).join('')+'</table>';
+    const NAME={buy:'Buy',sell:'Sell',long:'Long',short:'Short'};
+    el.innerHTML='<table><tr><th>Time</th><th>Type</th><th>Symbol</th><th>Side</th><th>Limit Price</th><th>Qty</th><th></th></tr>'+
+      a.orders.map(o=>'<tr><td>'+o.time+'</td><td>'+(o.mkt==='spot'?'Spot':'Futures '+o.lev+'x')+'</td><td><b>'+o.symbol+'</b></td>'+
+      '<td class="'+((o.side==='buy'||o.side==='long')?'up':'down')+'">'+NAME[o.side]+'</td>'+
+      '<td>'+fp(o.symbol,o.price)+'</td><td>'+fq(o.qty)+'</td>'+
+      '<td><button class="xbtn" onclick="cancelOrder('+o.id+')">Cancel</button></td></tr>').join('')+'</table>';
   }
   else if(curBtab==='accounts'){
-    el.innerHTML=`<table><tr><th>Account</th><th>Initial Collateral</th><th>USDT Balance</th><th>Spot Value</th><th>Positions (margin+uPnL)</th><th>Current Collateral</th><th>Total PnL</th><th>Return</th></tr>`+
+    el.innerHTML='<table><tr><th>Account</th><th>Initial Collateral</th><th>USDT Balance</th><th>Spot Value</th><th>Positions (margin+uPnL)</th><th>Current Collateral</th><th>Total PnL</th><th>Return</th></tr>'+
       state.accounts.map(ac=>{
         const e=equity(ac),pnl=e-ac.seed,pct=ac.seed?pnl/ac.seed*100:0;
         let posV=0;ac.positions.forEach(p=>posV+=p.margin+posPnl(p));
-        return `<tr><td><b>${ac.name}</b>${ac.id===acct().id?' <span style="color:var(--yellow);font-size:10px">●</span>':''}</td>
-        <td>${fmt(ac.seed,2)}</td><td>${fmt(ac.usdt,2)}</td><td>${fmt(spotValue(ac),2)}</td><td>${fmt(posV,2)}</td>
-        <td><b>${fmt(e,2)}</b></td>
-        <td class="${pnl>=0?'up':'down'}">${pnl>=0?'+':''}${fmt(pnl,2)}</td>
-        <td class="${pnl>=0?'up':'down'}">${pnl>=0?'+':''}${pct.toFixed(2)}%</td></tr>`;
+        return '<tr><td><b>'+ac.name+'</b>'+(ac.id===acct().id?' <span style="color:var(--yellow);font-size:10px">●</span>':'')+'</td>'+
+        '<td>'+fmt(ac.seed,2)+'</td><td>'+fmt(ac.usdt,2)+'</td><td>'+fmt(spotValue(ac),2)+'</td><td>'+fmt(posV,2)+'</td>'+
+        '<td><b>'+fmt(e,2)+'</b></td>'+
+        '<td class="'+(pnl>=0?'up':'down')+'">'+(pnl>=0?'+':'')+fmt(pnl,2)+'</td>'+
+        '<td class="'+(pnl>=0?'up':'down')+'">'+(pnl>=0?'+':'')+pct.toFixed(2)+'%</td></tr>';
       }).join('')+'</table>';
   }
   else if(curBtab==='pnl'){renderPnl(el);}
   else{
     if(!a.history.length){el.innerHTML='<div class="empty">No trade history</div>';return;}
-    el.innerHTML=`<table><tr><th>Time</th><th>Type</th><th>Symbol</th><th>Side</th><th>Qty</th><th>Price</th><th>Fee</th><th>Realized PnL</th></tr>`+
-      a.history.slice(0,100).map(h=>`<tr><td>${h.time}</td><td>${h.type}</td><td><b>${h.symbol}</b></td>
-      <td class="${SIDE_UP.includes(h.side)?'up':'down'}">${h.side}</td>
-      <td>${fq(h.qty)}</td><td>${fp(h.symbol,h.price)}</td><td>${fmt(h.fee,4)}</td>
-      <td class="${h.pnl==null?'':(h.pnl>=0?'up':'down')}">${h.pnl==null?'-':(h.pnl>=0?'+':'')+fmt(h.pnl,2)}</td></tr>`).join('')+'</table>';
+    el.innerHTML='<table><tr><th>Time</th><th>Type</th><th>Symbol</th><th>Side</th><th>Qty</th><th>Price</th><th>Fee</th><th>Realized PnL</th></tr>'+
+      a.history.slice(0,100).map(h=>'<tr><td>'+h.time+'</td><td>'+h.type+'</td><td><b>'+h.symbol+'</b></td>'+
+      '<td class="'+(SIDE_UP.indexOf(h.side)>=0?'up':'down')+'">'+h.side+'</td>'+
+      '<td>'+fq(h.qty)+'</td><td>'+fp(h.symbol,h.price)+'</td><td>'+fmt(h.fee,4)+'</td>'+
+      '<td class="'+(h.pnl==null?'':(h.pnl>=0?'up':'down'))+'">'+(h.pnl==null?'-':(h.pnl>=0?'+':'')+fmt(h.pnl,2))+'</td></tr>').join('')+'</table>';
   }
 }
-/* ============ Futures PnL Analysis ============ */
+
+/* ============ PnL Analysis tab ============ */
 function ymd(d){const p=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());}
 function pnlCfg(){
   if(!state.pnlCfg)state.pnlCfg={};
@@ -684,8 +687,7 @@ function applyPnl(){
 function autoSeeds(){
   const c=pnlCfg(), a=acct();
   c.ss=a.seed; c.es=equity(a);
-  save();renderBottom();
-  toast('Seeds filled from account','ok');
+  save();renderBottom();toast('Seeds filled from account','ok');
 }
 function renderPnl(el){
   const a=acct(), c=pnlCfg();
@@ -708,10 +710,8 @@ function renderPnl(el){
 
   const ss=c.ss!=null?c.ss:a.seed, es=c.es!=null?c.es:equity(a);
   const ret=ss>0?(es-ss)/ss*100:0, diff=es-ss;
-  const sign=v=>(v>=0?'+':'');
-  const cls=v=>v>=0?'up':'down';
+  const sg=v=>(v>=0?'+':''), cl=v=>v>=0?'up':'down';
 
-  // daily aggregation
   const daily={};
   closed.forEach(h=>{
     const d=ymd(new Date(h.ts));
@@ -720,63 +720,41 @@ function renderPnl(el){
     daily[d].n++;
   });
   const days=Object.keys(daily).sort();
-  // equity curve (cumulative realized pnl on top of start seed)
   const curve=[];let cum=ss;
-  days.forEach(d=>{cum+=daily[d].p-daily[d].l;curve.push({d,v:cum});});
+  days.forEach(d=>{cum+=daily[d].p-daily[d].l;curve.push({d:d,v:cum});});
 
-  el.innerHTML=`<div id="pnlWrap">
-    <div class="pnlBar">
-      <div class="pnlF"><label>From</label><input type="date" id="pFrom" value="${c.from}"></div>
-      <div class="pnlF"><label>To</label><input type="date" id="pTo" value="${c.to}"></div>
-      <div class="pnlF"><label>Quick Range</label>
-        <div class="qbtns">
-          <button class="qbtn" onclick="setRangeDays(7)">7D</button>
-          <button class="qbtn" onclick="setRangeDays(30)">1M</button>
-          <button class="qbtn" onclick="setRangeDays(90)">3M</button>
-        </div></div>
-      <div class="pnlF"><label>Start Seed (USDT)</label><input class="num" type="number" id="pSS" value="${ss.toFixed(2)}"></div>
-      <div class="pnlF"><label>End Seed (USDT)</label><input class="num" type="number" id="pES" value="${es.toFixed(2)}"></div>
-      <div class="pnlF"><label>&nbsp;</label><button class="ybtn" onclick="applyPnl()">Apply</button></div>
-      <div class="pnlF"><label>&nbsp;</label><button class="qbtn" onclick="autoSeeds()">Auto Fill</button></div>
-    </div>
-
-    <div class="cards">
-      <div class="card"><div class="lab">Return</div>
-        <div class="big ${cls(ret)}">${sign(ret)}${ret.toFixed(2)}%</div>
-        <div class="sub ${cls(diff)}">${sign(diff)}${fmt(diff,2)} USDT</div></div>
-      <div class="card"><div class="lab">Total Profit</div>
-        <div class="big up">+${fmt(profit,2)}</div>
-        <div class="sub">${wins} winning trades</div></div>
-      <div class="card"><div class="lab">Total Loss</div>
-        <div class="big down">-${fmt(loss,2)}</div>
-        <div class="sub">${losses} losing trades</div></div>
-      <div class="card"><div class="lab">Net Realized PnL</div>
-        <div class="big ${cls(net)}">${sign(net)}${fmt(net,2)}</div>
-        <div class="sub">${nTr} closed trades</div></div>
-      <div class="card"><div class="lab">Win Rate</div>
-        <div class="big">${winRate.toFixed(1)}%</div>
-        <div class="sub">${wins}W / ${losses}L</div></div>
-      <div class="card"><div class="lab">Profit Factor</div>
-        <div class="big">${pf===Infinity?'∞':pf.toFixed(2)}</div>
-        <div class="sub">Avg W ${fmt(avgW,2)} / Avg L ${fmt(avgL,2)}</div></div>
-      <div class="card"><div class="lab">Total Fees</div>
-        <div class="big">${fmt(fees,2)}</div>
-        <div class="sub">${inRange.length} transactions</div></div>
-      <div class="card"><div class="lab">Best / Worst Trade</div>
-        <div class="big" style="font-size:14px"><span class="up">${best?'+'+fmt(best.pnl,2):'-'}</span> / <span class="down">${worst?fmt(worst.pnl,2):'-'}</span></div>
-        <div class="sub">${best?best.symbol:''} ${worst?'/ '+worst.symbol:''}</div></div>
-    </div>
-
-    <div class="secTitle">Equity Curve (start seed + cumulative realized PnL)</div>
-    <div id="eqChartWrap"><canvas id="eqChart"></canvas></div>
-
-    <div class="secTitle">Daily Breakdown</div>
-    ${days.length?`<table><tr><th>Date</th><th>Trades</th><th>Profit</th><th>Loss</th><th>Net</th><th>Cumulative</th></tr>`+
-      days.map((d,i)=>{const x=daily[d],n=x.p-x.l;
-        return `<tr><td>${d}</td><td>${x.n}</td><td class="up">+${fmt(x.p,2)}</td><td class="down">-${fmt(x.l,2)}</td>
-        <td class="${cls(n)}">${sign(n)}${fmt(n,2)}</td><td>${fmt(curve[i].v,2)}</td></tr>`;}).join('')+'</table>'
-      :`<div class="empty">No closed futures trades in this period${noTs?' (records saved before this update have no date and are excluded)':''}</div>`}
-  </div>`;
+  el.innerHTML='<div id="pnlWrap">'+
+    '<div class="pnlBar">'+
+      '<div class="pnlF"><label>From</label><input type="date" id="pFrom" value="'+c.from+'"></div>'+
+      '<div class="pnlF"><label>To</label><input type="date" id="pTo" value="'+c.to+'"></div>'+
+      '<div class="pnlF"><label>Quick Range</label><div class="qbtns">'+
+        '<button class="qbtn" onclick="setRangeDays(7)">7D</button>'+
+        '<button class="qbtn" onclick="setRangeDays(30)">1M</button>'+
+        '<button class="qbtn" onclick="setRangeDays(90)">3M</button></div></div>'+
+      '<div class="pnlF"><label>Start Seed (USDT)</label><input class="num" type="number" id="pSS" value="'+ss.toFixed(2)+'"></div>'+
+      '<div class="pnlF"><label>End Seed (USDT)</label><input class="num" type="number" id="pES" value="'+es.toFixed(2)+'"></div>'+
+      '<div class="pnlF"><label>&nbsp;</label><button class="ybtn" onclick="applyPnl()">Apply</button></div>'+
+      '<div class="pnlF"><label>&nbsp;</label><button class="qbtn" onclick="autoSeeds()">Auto Fill</button></div>'+
+    '</div>'+
+    '<div class="cards">'+
+      '<div class="card"><div class="lab">Return</div><div class="big '+cl(ret)+'">'+sg(ret)+ret.toFixed(2)+'%</div><div class="sub '+cl(diff)+'">'+sg(diff)+fmt(diff,2)+' USDT</div></div>'+
+      '<div class="card"><div class="lab">Total Profit</div><div class="big up">+'+fmt(profit,2)+'</div><div class="sub">'+wins+' winning trades</div></div>'+
+      '<div class="card"><div class="lab">Total Loss</div><div class="big down">-'+fmt(loss,2)+'</div><div class="sub">'+losses+' losing trades</div></div>'+
+      '<div class="card"><div class="lab">Net Realized PnL</div><div class="big '+cl(net)+'">'+sg(net)+fmt(net,2)+'</div><div class="sub">'+nTr+' closed trades</div></div>'+
+      '<div class="card"><div class="lab">Win Rate</div><div class="big">'+winRate.toFixed(1)+'%</div><div class="sub">'+wins+'W / '+losses+'L</div></div>'+
+      '<div class="card"><div class="lab">Profit Factor</div><div class="big">'+(pf===Infinity?'∞':pf.toFixed(2))+'</div><div class="sub">Avg W '+fmt(avgW,2)+' / Avg L '+fmt(avgL,2)+'</div></div>'+
+      '<div class="card"><div class="lab">Total Fees</div><div class="big">'+fmt(fees,2)+'</div><div class="sub">'+inRange.length+' transactions</div></div>'+
+      '<div class="card"><div class="lab">Best / Worst Trade</div><div class="big" style="font-size:13px"><span class="up">'+(best?'+'+fmt(best.pnl,2):'-')+'</span><br><span class="down">'+(worst?fmt(worst.pnl,2):'-')+'</span></div><div class="sub">'+(best?best.symbol:'')+(worst?' / '+worst.symbol:'')+'</div></div>'+
+    '</div>'+
+    '<div class="secTitle">Equity Curve (start seed + cumulative realized PnL)</div>'+
+    '<div id="eqChartWrap"><canvas id="eqChart"></canvas></div>'+
+    '<div class="secTitle">Daily Breakdown</div>'+
+    (days.length?('<table><tr><th>Date</th><th>Trades</th><th>Profit</th><th>Loss</th><th>Net</th><th>Cumulative</th></tr>'+
+      days.map(function(d,i){const x=daily[d],n=x.p-x.l;
+        return '<tr><td>'+d+'</td><td>'+x.n+'</td><td class="up">+'+fmt(x.p,2)+'</td><td class="down">-'+fmt(x.l,2)+'</td>'+
+        '<td class="'+cl(n)+'">'+sg(n)+fmt(n,2)+'</td><td>'+fmt(curve[i].v,2)+'</td></tr>';}).join('')+'</table>')
+      :('<div class="empty">No closed futures trades in this period'+(noTs?' (records saved before this update have no date and are excluded)':'')+'</div>'))+
+  '</div>';
 
   drawEqChart(curve,ss);
 }
@@ -786,11 +764,11 @@ function drawEqChart(curve,ss){
   if(W<=0||H<=0)return;
   const dpr=window.devicePixelRatio||1;
   cv.width=W*dpr;cv.height=H*dpr;
-  const ctx=cv.getContext('2d');ctx.scale(dpr,dpr);
+  const ctx=cv.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);
   ctx.clearRect(0,0,W,H);
   const pts=[{d:'',v:ss}].concat(curve);
   if(pts.length<2){ctx.fillStyle='#848E9C';ctx.font='12px sans-serif';ctx.textAlign='center';ctx.fillText('Not enough data to plot',W/2,H/2);return;}
-  let hi=Math.max(...pts.map(p=>p.v)),lo=Math.min(...pts.map(p=>p.v));
+  let hi=Math.max.apply(null,pts.map(p=>p.v)),lo=Math.min.apply(null,pts.map(p=>p.v));
   const rng=(hi-lo)||Math.abs(hi)*0.02||1;hi+=rng*.1;lo-=rng*.1;
   const padR=62;
   const x=i=>i/(pts.length-1)*(W-padR), y=v=>(hi-v)/(hi-lo)*(H-16)+4;
@@ -798,18 +776,15 @@ function drawEqChart(curve,ss){
   for(let i=0;i<=4;i++){const v=hi-(hi-lo)*i/4,yy=y(v);
     ctx.beginPath();ctx.moveTo(0,yy);ctx.lineTo(W-padR,yy);ctx.stroke();
     ctx.fillText(fmt(v,2),W-padR+5,yy+3);}
-  // baseline (start seed)
   ctx.strokeStyle='#848E9C';ctx.setLineDash([3,3]);
   ctx.beginPath();ctx.moveTo(0,y(ss));ctx.lineTo(W-padR,y(ss));ctx.stroke();ctx.setLineDash([]);
   const end=pts[pts.length-1].v, col=end>=ss?'#0ECB81':'#F6465D';
-  // area
   const g=ctx.createLinearGradient(0,0,0,H);
   g.addColorStop(0,col+'55');g.addColorStop(1,col+'00');
   ctx.beginPath();ctx.moveTo(x(0),y(pts[0].v));
   pts.forEach((p,i)=>ctx.lineTo(x(i),y(p.v)));
   ctx.lineTo(x(pts.length-1),H);ctx.lineTo(0,H);ctx.closePath();
   ctx.fillStyle=g;ctx.fill();
-  // line
   ctx.beginPath();ctx.moveTo(x(0),y(pts[0].v));
   pts.forEach((p,i)=>ctx.lineTo(x(i),y(p.v)));
   ctx.strokeStyle=col;ctx.lineWidth=2;ctx.stroke();ctx.lineWidth=1;
@@ -824,8 +799,8 @@ function renderOrderPanel(){
   $('sellBtn').textContent=fut?'Short (Sell)':'Sell';
   $('amtLabel').textContent=fut?'Margin':'Order Amount (Buy: USDT / Sell: qty)';
   $('feeNote').textContent=fut
-    ?`Fee ${FUT_FEE*100}% · Isolated margin · Liq. price is an estimate based on a simplified model (maintenance margin ${MAINT*100}%).`
-    :`Fee ${SPOT_FEE*100}% · Enter USDT amount to buy, coin quantity to sell.`;
+    ?'Fee '+(FUT_FEE*100)+'% · Isolated margin · Liq. price is an estimate based on a simplified model (maintenance margin '+(MAINT*100)+'%).'
+    :'Fee '+(SPOT_FEE*100)+'% · Enter USDT amount to buy, coin quantity to sell.';
   updateEst();
 }
 function updateEst(){
@@ -847,14 +822,14 @@ function renderAll(){renderEquity();renderBottom();renderSymHeader();renderAcctS
 function renderAcctModal(){
   $('acctList').innerHTML=state.accounts.map(a=>{
     const e=equity(a),pnl=e-a.seed;
-    return `<div class="acctRow">
-      <div class="grow"><div class="nm">${a.name} ${a.id===acct().id?'<span style="color:var(--yellow);font-size:10px">● Active</span>':''}</div>
-      <div class="info">Initial ${fmt(a.seed,0)} → Current ${fmt(e,2)} USDT (<span class="${pnl>=0?'up':'down'}">${pnl>=0?'+':''}${fmt(pnl,2)}</span>)</div>
-      <div class="fundEdit">Initial <input type="number" id="fs_${a.id}" value="${a.seed.toFixed(2)}"> Current <input type="number" id="fc_${a.id}" value="${e.toFixed(2)}"> <button class="mini" onclick="applyFunds('${a.id}')">Apply</button></div></div>
-      <button class="mini" onclick="switchAcct('${a.id}')">Select</button>
-      <button class="mini" onclick="resetAcct('${a.id}')">Reset</button>
-      <button class="mini danger" onclick="delAcct('${a.id}')">Delete</button>
-    </div>`;
+    return '<div class="acctRow">'+
+      '<div class="grow"><div class="nm">'+a.name+' '+(a.id===acct().id?'<span style="color:var(--yellow);font-size:10px">● Active</span>':'')+'</div>'+
+      '<div class="info">Initial '+fmt(a.seed,0)+' → Current '+fmt(e,2)+' USDT (<span class="'+(pnl>=0?'up':'down')+'">'+(pnl>=0?'+':'')+fmt(pnl,2)+'</span>)</div>'+
+      '<div class="fundEdit">Initial <input type="number" id="fs_'+a.id+'" value="'+a.seed.toFixed(2)+'"> Current <input type="number" id="fc_'+a.id+'" value="'+e.toFixed(2)+'"> <button class="mini" onclick="applyFunds(\''+a.id+'\')">Apply</button></div></div>'+
+      '<button class="mini" onclick="switchAcct(\''+a.id+'\')">Select</button>'+
+      '<button class="mini" onclick="resetAcct(\''+a.id+'\')">Reset</button>'+
+      '<button class="mini danger" onclick="delAcct(\''+a.id+'\')">Delete</button>'+
+    '</div>';
   }).join('');
 }
 function applyFunds(id){
@@ -867,25 +842,25 @@ function applyFunds(id){
   if(a.usdt+diff<0){toast('Cannot set below the value of spot holdings/positions. Close them first.','err');return;}
   a.usdt+=diff;
   save();renderAll();renderAcctModal();
-  toast(`Collateral updated — Initial ${fmt(s,2)} / Current ${fmt(c,2)} USDT (PnL ${c-s>=0?'+':''}${fmt(c-s,2)})`,'ok');
+  toast('Collateral updated — Initial '+fmt(s,2)+' / Current '+fmt(c,2)+' USDT','ok');
 }
 function switchAcct(id){state.activeId=id;save();renderAll();renderAcctModal();toast('Switched to: '+acct().name);}
 function resetAcct(id){
   const a=state.accounts.find(x=>x.id===id);if(!a)return;
-  if(!confirm(`Reset "${a.name}" to initial collateral ${fmt(a.seed,0)} USDT? All trade records will be deleted.`))return;
+  if(!confirm('Reset "'+a.name+'" to initial collateral '+fmt(a.seed,0)+' USDT? All trade records will be deleted.'))return;
   a.usdt=a.seed;a.spot={};a.positions=[];a.orders=[];a.history=[];
   save();renderAll();renderAcctModal();toast('Account reset','ok');
 }
 function delAcct(id){
   if(state.accounts.length<=1){toast('Cannot delete the last account','err');return;}
   const a=state.accounts.find(x=>x.id===id);
-  if(!confirm(`Delete account "${a.name}"?`))return;
+  if(!confirm('Delete account "'+a.name+'"?'))return;
   state.accounts=state.accounts.filter(x=>x.id!==id);
   if(state.activeId===id)state.activeId=state.accounts[0].id;
   save();renderAll();renderAcctModal();
 }
 
-/* ============ Event bindings ============ */
+/* ============ Events ============ */
 function selectSymbol(s){
   curSym=s;
   document.querySelectorAll('.mkt').forEach(el=>el.classList.toggle('active',el.dataset.s===s));
@@ -901,7 +876,7 @@ $('naAdd').onclick=()=>{
   if(!seed||seed<=0){toast('Enter an initial collateral amount','err');return;}
   state.accounts.push(mkAcct(name,seed));
   $('naName').value='';
-  save();renderAcctSelect();renderAcctModal();toast(`Account "${name}" created (initial ${fmt(seed,0)} USDT)`,'ok');
+  save();renderAcctSelect();renderAcctModal();toast('Account "'+name+'" created','ok');
 };
 document.querySelectorAll('.opTab').forEach(b=>b.onclick=()=>{
   curMkt=b.dataset.mkt;
@@ -920,12 +895,8 @@ document.querySelectorAll('.btab').forEach(b=>b.onclick=()=>{
 });
 document.querySelectorAll('.pct').forEach(b=>b.onclick=()=>{
   const a=acct(),p=+b.dataset.p/100;
-  if(curMkt==='spot'){
-    $('amt').value=(a.usdt*p).toFixed(2);
-  }else{
-    const lev=parseInt($('lev').value);
-    $('amt').value=(a.usdt*p/(1+lev*FUT_FEE)).toFixed(2);
-  }
+  if(curMkt==='spot'){$('amt').value=(a.usdt*p).toFixed(2);}
+  else{const lev=parseInt($('lev').value);$('amt').value=(a.usdt*p/(1+lev*FUT_FEE)).toFixed(2);}
   updateEst();
 });
 $('lev').oninput=()=>{$('levVal').textContent=$('lev').value+'x';updateEst();};
@@ -933,7 +904,7 @@ $('amt').oninput=updateEst;
 $('limitPrice').oninput=updateEst;
 $('buyBtn').onclick=()=>placeOrder('buy');
 $('sellBtn').onclick=()=>placeOrder('sell');
-$('intervalBar').innerHTML=INTERVALS.map(iv=>`<button class="ibtn ${iv===curIv?'active':''}" data-iv="${iv}">${iv}</button>`).join('');
+$('intervalBar').innerHTML=INTERVALS.map(iv=>'<button class="ibtn '+(iv===curIv?'active':'')+'" data-iv="'+iv+'">'+iv+'</button>').join('');
 document.querySelectorAll('.ibtn').forEach(b=>b.onclick=()=>{
   curIv=b.dataset.iv;
   document.querySelectorAll('.ibtn').forEach(x=>x.classList.toggle('active',x===b));
