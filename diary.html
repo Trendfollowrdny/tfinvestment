@@ -53,7 +53,6 @@ input,select,textarea{font:inherit;color:inherit;font-size:16px}
 .btn-danger{color:var(--danger)}
 .lock-err{color:var(--danger);font-size:13px;min-height:20px;margin:2px 0 6px}
 .lock-note{color:var(--text3);font-size:12px;margin-top:16px;line-height:1.5}
-.lock-link{color:var(--text2);font-size:13px;margin-top:14px;text-decoration:underline}
 
 /* ---------- Header ---------- */
 header.top{position:sticky;top:0;z-index:20;background:var(--card);background:color-mix(in srgb,var(--card) 92%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line);padding-top:var(--safe-t)}
@@ -117,7 +116,10 @@ header.top .wrap{display:flex;align-items:center;gap:8px;height:56px}
 .post .meta .mood{font-size:18px}
 .content{font-size:16px;line-height:1.8;padding-top:20px;overflow-wrap:anywhere}
 .content p,.content div{min-height:1em}
-.content img{max-width:100%;height:auto;border-radius:8px;display:block;margin:10px auto}
+.content img,.ed-body img{max-width:100%;height:auto;border-radius:8px;display:block;margin:10px auto}
+img[data-asset]:not([src]){min-height:120px;width:100%;background:var(--line);border-radius:8px}
+.pc-thumb[data-asset]:not([src]){min-height:0;width:84px}
+img.broken{min-height:60px;font-size:13px;color:var(--text3);text-align:center}
 .content blockquote{border-left:4px solid var(--accent);background:var(--bg);padding:10px 16px;margin:12px 0;border-radius:0 8px 8px 0;color:var(--text2)}
 .content hr{border:none;border-top:1px solid var(--line);margin:22px 0}
 .content h2{font-size:22px;margin:16px 0 6px;line-height:1.4}
@@ -188,8 +190,7 @@ header.top .wrap{display:flex;align-items:center;gap:8px;height:56px}
     <input class="field hidden" type="password" id="pw2" placeholder="비밀번호 확인" autocomplete="new-password">
     <div class="lock-err" id="lockErr"></div>
     <button class="btn btn-primary" id="lockBtn" type="submit">열기</button>
-    <p class="lock-note hidden" id="lockNote">⚠️ 비밀번호를 잊어버리면 일기를 복구할 수 없어요.<br>일기는 이 비밀번호로 암호화되어 이 기기에만 저장됩니다.</p>
-    <button type="button" class="lock-link" id="restoreLink">백업 파일에서 복원하기</button>
+    <p class="lock-note" id="lockNote"></p>
   </form>
 </section>
 
@@ -208,137 +209,270 @@ header.top .wrap{display:flex;align-items:center;gap:8px;height:56px}
 <script>
 'use strict';
 /* =========================================================
-   Storage (IndexedDB) + Crypto (PBKDF2 → AES-GCM)
-   모든 일기는 비밀번호에서 유도한 키로 암호화되어 저장됩니다.
+   암호화 구조
+   - 무작위 "데이터 키"로 모든 일기와 사진을 AES-GCM 암호화
+   - 데이터 키는 비밀번호(PBKDF2)로 다시 암호화해서 저장
+     → 비밀번호 변경 시 데이터 키만 다시 감싸면 됨
+   저장소
+   - Claude 링크에서 열면: 클라우드(본인 전용 공간) → 모든 기기에서 동기화
+   - 그 외(GitHub Pages 등): 이 브라우저의 IndexedDB
    ========================================================= */
-const DB_NAME = 'secret-diary', DB_VER = 1, ITER = 250000;
+const ITER = 250000;
 const AUTO_LOCK_MS = 5 * 60 * 1000;
 const te = new TextEncoder(), td = new TextDecoder();
-let db = null, key = null, entries = [];
+let store = null, dek = null, entries = [];
+const imgCache = new Map(); // 사진 id → Promise<objectURL>
 
-function openDB() {
-  return new Promise((res, rej) => {
-    const r = indexedDB.open(DB_NAME, DB_VER);
-    r.onupgradeneeded = () => {
-      const d = r.result;
-      d.createObjectStore('meta');
-      d.createObjectStore('entries', { keyPath: 'id' });
-    };
-    r.onsuccess = () => res(r.result);
-    r.onerror = () => rej(r.error);
-  });
-}
-function tx(stores, mode, fn) {
-  return new Promise((res, rej) => {
-    const t = db.transaction(stores, mode);
-    let out;
-    const r = fn(t);
-    if (r && 'onsuccess' in r) r.onsuccess = () => { out = r.result; };
-    t.oncomplete = () => res(out);
-    t.onerror = () => rej(t.error);
-    t.onabort = () => rej(t.error || new Error('저장 공간이 부족할 수 있어요'));
-  });
-}
-const getMeta = () => tx('meta', 'readonly', t => t.objectStore('meta').get('auth'));
-const getAllRaw = () => tx('entries', 'readonly', t => t.objectStore('entries').getAll());
+/* ---------- encoding / crypto ---------- */
+const b64 = u8 => { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
+const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
+const concat = (a, b) => { const o = new Uint8Array(a.length + b.length); o.set(a); o.set(b, a.length); return o; };
 
-async function deriveKey(pw, salt) {
+async function kekFrom(pw, salt) {
   const base = await crypto.subtle.importKey('raw', te.encode(pw), 'PBKDF2', false, ['deriveKey']);
   return crypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations: ITER, hash: 'SHA-256' },
     base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
 }
-async function encryptObj(k, obj) {
+const importDek = raw => crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt']);
+async function encBytes(k, u8) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, k, te.encode(JSON.stringify(obj)));
-  return { iv, ct: new Uint8Array(ct) };
+  return concat(iv, new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, k, u8)));
 }
-async function decryptObj(k, rec) {
-  const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: rec.iv }, k, rec.ct);
-  return JSON.parse(td.decode(pt));
+async function decBytes(k, u8) {
+  return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: u8.subarray(0, 12) }, k, u8.subarray(12)));
 }
-const b64 = u8 => { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
-const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
-const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
+const encObj = async (k, obj) => b64(await encBytes(k, te.encode(JSON.stringify(obj))));
+const decObj = async (k, s) => JSON.parse(td.decode(await decBytes(k, unb64(s))));
 
-async function setupPassword(pw) {
+async function makeAuth(pw, rawDek) {
   const salt = crypto.getRandomValues(new Uint8Array(16));
-  const k = await deriveKey(pw, salt);
-  const check = await encryptObj(k, 'diary-ok');
-  await tx('meta', 'readwrite', t => t.objectStore('meta').put({ salt, check }, 'auth'));
+  return { v: 2, salt: b64(salt), wrapped: b64(await encBytes(await kekFrom(pw, salt), rawDek)) };
+}
+async function openAuth(pw, auth) {
+  if (!auth || auth.v !== 2) return null;
+  try { return await decBytes(await kekFrom(pw, unb64(auth.salt)), unb64(auth.wrapped)); }
+  catch (e) { return null; }
+}
+
+/* ---------- 저장소: 클라우드 ---------- */
+const ERR_KO = {
+  quota_exceeded: '저장 공간이 가득 찼어요. 사진이 많은 오래된 일기를 지워 주세요.',
+  quota_or_state: '사진 저장 공간이 가득 찼어요.',
+  too_large: '사진이 너무 커요.',
+  rate_limited: '요청이 너무 많아요. 잠시 후 다시 시도해 주세요.',
+  resource_exhausted: '요청이 너무 많아요. 잠시 후 다시 시도해 주세요.',
+  revoked: '접근 권한이 바뀌었어요. 페이지를 새로고침해 주세요.',
+  upstream_auth: '로그인이 만료됐어요. 페이지를 새로고침해 주세요.',
+};
+const errMsg = e => (e && ERR_KO[e.code]) || (e && e.message) || String(e);
+async function retryOnce(fn) {
+  try { return await fn(); }
+  catch (e) {
+    if (e && (e.code === 'unavailable' || e.code === 'store_unavailable')) { await new Promise(r => setTimeout(r, 600 + Math.random() * 600)); return fn(); }
+    throw e;
+  }
+}
+async function cloudStore(cl) {
+  const [db, user] = await Promise.all([cl.use('db'), cl.use('user')]);
+  if (!db || !user) return null;
+  const me = await user.id();
+  if (!me) return null;
+  const assets = await cl.use('assets');
+  const base = 'data/users/' + me;
+  const authRef = db.doc(base + '/auth');
+  const col = db.doc(base + '/diary').collection('entries');
+  return {
+    kind: 'cloud',
+    async getAuth() { const s = await retryOnce(() => authRef.get()); return s.exists ? s.data() : null; },
+    setAuth: a => retryOnce(() => authRef.set(a)),
+    async listEntries() {
+      const out = []; let last = null;
+      for (;;) {
+        const q = (last ? col.where('k', '>', last) : col).orderBy('k').limit(500);
+        const s = await retryOnce(() => q.get());
+        s.docs.forEach(d => { const x = d.data(); out.push({ id: d.id, data: x.data }); });
+        if (s.size < 500) break;
+        last = s.docs[s.size - 1].data().k;
+      }
+      return out;
+    },
+    putEntry(id, data) {
+      if (data.length > 250000) return Promise.reject(new Error('글이 너무 길어요. 나눠서 저장해 주세요.'));
+      return retryOnce(() => col.doc(id).set({ k: id, data }));
+    },
+    delEntry: id => retryOnce(() => col.doc(id).delete()),
+    canImages: !!assets,
+    async putImage(text) {
+      const r = await retryOnce(() => assets.upload(new Blob([text], { type: 'text/plain' }), { type: 'text/plain' }));
+      return r.id;
+    },
+    async getImage(id) {
+      const r = await fetch('/_blob/' + id);
+      if (!r.ok) throw new Error('사진을 불러오지 못했어요');
+      return r.text();
+    },
+    delImage: id => assets ? assets.delete(id).catch(() => {}) : Promise.resolve(),
+    async usage() {
+      if (!assets) return '';
+      try { const { usage: u } = await assets.list(); return `사진 저장공간 ${(u.bytes / 1048576).toFixed(1)}MB / ${(u.maxBytes / 1048576).toFixed(0)}MB`; }
+      catch (e) { return ''; }
+    },
+    async saveFile(filename, data) {
+      const dl = await cl.use('downloads');
+      if (!dl) throw new Error('이 화면에서는 파일 저장을 사용할 수 없어요');
+      const r = await dl.save({ filename, data });
+      return r.status;
+    },
+  };
+}
+
+/* ---------- 저장소: 이 브라우저 (IndexedDB) ---------- */
+async function localStore() {
+  const db = await new Promise((res, rej) => {
+    const r = indexedDB.open('secret-diary-v2', 1);
+    r.onupgradeneeded = () => {
+      const d = r.result;
+      d.createObjectStore('meta');
+      d.createObjectStore('entries', { keyPath: 'id' });
+      d.createObjectStore('images', { keyPath: 'id' });
+    };
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+  const tx = (name, mode, fn) => new Promise((res, rej) => {
+    const t = db.transaction(name, mode); let out;
+    const r = fn(t.objectStore(name));
+    if (r) r.onsuccess = () => { out = r.result; };
+    t.oncomplete = () => res(out);
+    t.onerror = () => rej(t.error);
+    t.onabort = () => rej(t.error || new Error('저장 공간이 부족할 수 있어요'));
+  });
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
-  return k;
+  return {
+    kind: 'local',
+    getAuth: () => tx('meta', 'readonly', s => s.get('auth')).then(a => a || null),
+    setAuth: a => tx('meta', 'readwrite', s => s.put(a, 'auth')),
+    listEntries: () => tx('entries', 'readonly', s => s.getAll()),
+    putEntry: (id, data) => tx('entries', 'readwrite', s => s.put({ id, data })),
+    delEntry: id => tx('entries', 'readwrite', s => s.delete(id)),
+    canImages: true,
+    async putImage(text) { const id = uid(); await tx('images', 'readwrite', s => s.put({ id, text })); return id; },
+    async getImage(id) { const r = await tx('images', 'readonly', s => s.get(id)); if (!r) throw new Error('사진이 없어요'); return r.text; },
+    delImage: id => tx('images', 'readwrite', s => s.delete(id)).catch(() => {}),
+    async usage() {
+      try { const est = await navigator.storage.estimate(); return `사용 중인 저장공간 약 ${(est.usage / 1048576).toFixed(1)}MB`; } catch (_) { return ''; }
+    },
+    async saveFile(filename, data) {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([data], { type: 'application/json' }));
+      a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+      return 'saved';
+    },
+  };
 }
-async function unlock(pw) {
-  const meta = await getMeta();
-  const k = await deriveKey(pw, meta.salt);
-  try { if (await decryptObj(k, meta.check) !== 'diary-ok') return null; } catch (e) { return null; }
-  return k;
+
+/* Claude 링크 안에서 열렸는지 확인 (GitHub Pages·파일로 열면 바로 로컬 저장소) */
+async function pickStore() {
+  const h = location.hostname;
+  const plainWeb = location.protocol === 'file:' || h === 'localhost' || h === '127.0.0.1' || h.endsWith('github.io');
+  if (!plainWeb) {
+    for (let i = 0; i < 30 && !(window.claude && window.claude.use); i++) await new Promise(r => setTimeout(r, 100));
+  }
+  if (window.claude && typeof window.claude.use === 'function') {
+    const s = await cloudStore(window.claude);
+    if (!s) throw new Error('cloud');
+    return s;
+  }
+  return localStore();
 }
+
+/* ---------- 일기 / 사진 ---------- */
 async function loadEntries() {
-  const raw = await getAllRaw();
+  const raw = await store.listEntries();
   const out = [];
   for (const r of raw) {
-    try { out.push(Object.assign(await decryptObj(key, r), { id: r.id })); } catch (e) { console.warn('decrypt fail', r.id); }
+    try { out.push(Object.assign(await decObj(dek, r.data), { id: r.id })); } catch (e) { console.warn('decrypt fail', r.id); }
   }
   entries = out;
   sortEntries();
 }
-function sortEntries() {
-  entries.sort((a, b) => (b.date.localeCompare(a.date)) || (b.createdAt - a.createdAt));
-}
+function sortEntries() { entries.sort((a, b) => (b.date.localeCompare(a.date)) || (b.createdAt - a.createdAt)); }
 async function saveEntry(e) {
   const { id, ...data } = e;
-  const enc = await encryptObj(key, data);
-  await tx('entries', 'readwrite', t => t.objectStore('entries').put({ id, ...enc }));
+  await store.putEntry(id, await encObj(dek, data));
   const i = entries.findIndex(x => x.id === id);
   if (i >= 0) entries[i] = e; else entries.push(e);
   sortEntries();
 }
 async function deleteEntry(id) {
-  await tx('entries', 'readwrite', t => t.objectStore('entries').delete(id));
+  const e = entries.find(x => x.id === id);
+  await store.delEntry(id);
   entries = entries.filter(x => x.id !== id);
+  if (e) assetIds(e.html).forEach(a => store.delImage(a));
 }
-async function changePassword(oldPw, newPw) {
-  if (!(await unlock(oldPw))) throw new Error('현재 비밀번호가 맞지 않아요');
-  const salt = crypto.getRandomValues(new Uint8Array(16));
-  const k = await deriveKey(newPw, salt);
-  const check = await encryptObj(k, 'diary-ok');
-  const recs = [];
-  for (const e of entries) { const { id, ...d } = e; recs.push({ id, ...(await encryptObj(k, d)) }); }
-  await tx(['meta', 'entries'], 'readwrite', t => {
-    t.objectStore('meta').put({ salt, check }, 'auth');
-    const s = t.objectStore('entries');
-    recs.forEach(r => s.put(r));
+const ASSET_RE = /data-asset="([A-Za-z0-9-]{8,64})"/g;
+const assetIds = html => [...String(html).matchAll(ASSET_RE)].map(m => m[1]);
+
+async function uploadImage(blob) {
+  const enc = await encBytes(dek, new Uint8Array(await blob.arrayBuffer()));
+  const id = await store.putImage(b64(enc));
+  imgCache.set(id, Promise.resolve(URL.createObjectURL(blob)));
+  return id;
+}
+function imageURL(id) {
+  if (!imgCache.has(id)) {
+    const p = store.getImage(id)
+      .then(t => decBytes(dek, unb64(t)))
+      .then(u8 => URL.createObjectURL(new Blob([u8], { type: 'image/jpeg' })));
+    p.catch(() => imgCache.delete(id));
+    imgCache.set(id, p);
+  }
+  return imgCache.get(id);
+}
+function hydrate(root) {
+  root.querySelectorAll('img[data-asset]').forEach(img => {
+    if (img.getAttribute('src')) return;
+    imageURL(img.dataset.asset).then(u => { img.src = u; }).catch(() => { img.classList.add('broken'); img.alt = '사진을 불러오지 못했어요'; });
   });
-  key = k;
 }
+function clearImageCache() {
+  imgCache.forEach(p => p.then(u => URL.revokeObjectURL(u)).catch(() => {}));
+  imgCache.clear();
+}
+
+/* ---------- 백업 ---------- */
 async function exportBackup() {
-  const meta = await getMeta();
-  const raw = await getAllRaw();
-  const data = {
-    app: 'secret-diary', v: 1, exportedAt: new Date().toISOString(),
-    salt: b64(meta.salt), check: { iv: b64(meta.check.iv), ct: b64(meta.check.ct) },
-    entries: raw.map(r => ({ id: r.id, iv: b64(r.iv), ct: b64(r.ct) }))
-  };
-  const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `diary-backup-${ymd(new Date())}.json`;
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  const ids = [...new Set(entries.flatMap(e => assetIds(e.html)))];
+  const images = {};
+  for (const id of ids) { try { images[id] = await store.getImage(id); } catch (_) {} }
+  const raw = await store.listEntries();
+  const data = JSON.stringify({ app: 'secret-diary', v: 2, exportedAt: new Date().toISOString(), auth: await store.getAuth(), entries: raw, images });
+  return store.saveFile(`diary-backup-${ymd(new Date())}.json`, data);
 }
-async function importBackup(file) {
-  const data = JSON.parse(await file.text());
-  if (data.app !== 'secret-diary' || !data.salt || !data.check || !Array.isArray(data.entries)) throw new Error('올바른 백업 파일이 아니에요');
-  const meta = { salt: unb64(data.salt), check: { iv: unb64(data.check.iv), ct: unb64(data.check.ct) } };
-  const recs = data.entries.map(r => ({ id: r.id, iv: unb64(r.iv), ct: unb64(r.ct) }));
-  await tx(['meta', 'entries'], 'readwrite', t => {
-    t.objectStore('meta').put(meta, 'auth');
-    const s = t.objectStore('entries');
-    s.clear();
-    recs.forEach(r => s.put(r));
-  });
-  return recs.length;
+/* 백업 파일의 일기를 현재 일기장에 합치기 (백업 당시 비밀번호 필요) */
+async function importBackup(data, pw) {
+  const raw = await openAuth(pw, data.auth);
+  if (!raw) throw new Error('백업 파일의 비밀번호가 맞지 않아요');
+  const bk = await importDek(raw);
+  const idMap = {};
+  let n = 0;
+  for (const r of data.entries) {
+    const e = Object.assign(await decObj(bk, r.data), { id: r.id });
+    for (const old of assetIds(e.html)) {
+      if (!idMap[old] && data.images && data.images[old]) {
+        const u8 = await decBytes(bk, unb64(data.images[old]));
+        idMap[old] = await store.putImage(b64(await encBytes(dek, u8)));
+      }
+      if (idMap[old]) e.html = e.html.split(`data-asset="${old}"`).join(`data-asset="${idMap[old]}"`);
+    }
+    await saveEntry(e);
+    n++;
+    toast(`가져오는 중... ${n}/${data.entries.length}`, 1500);
+  }
+  return n;
 }
 
 /* =========================================================
@@ -382,13 +516,24 @@ function ask(msg, { ok = '확인', cancel = '취소', danger = false } = {}) {
   });
 }
 const notify = msg => ask(msg, { cancel: null });
+function askPassword(msg) {
+  return new Promise(res => {
+    const o = openSheet(`<form id="apForm" autocomplete="off">
+      <p style="white-space:pre-line;font-size:15px;margin:4px 0 12px">${esc(msg)}</p>
+      <input class="field" type="password" id="apPw" placeholder="비밀번호">
+      <div class="row"><button type="button" class="btn btn-line" id="apNo">취소</button><button class="btn btn-primary">확인</button></div></form>`);
+    o.querySelector('#apNo').onclick = () => { o.remove(); res(null); };
+    o.addEventListener('click', ev => { if (ev.target === o) res(null); });
+    o.querySelector('#apForm').onsubmit = ev => { ev.preventDefault(); const v = o.querySelector('#apPw').value; o.remove(); res(v); };
+    setTimeout(() => o.querySelector('#apPw').focus(), 50);
+  });
+}
 function textOf(html) {
   const d = document.createElement('div');
-  d.innerHTML = html.replace(/<(br|\/p|\/div|\/h\d|\/li|\/blockquote)[^>]*>/gi, ' $&');
-  d.querySelectorAll('img').forEach(i => i.remove());
+  d.innerHTML = html.replace(/<(br|\/p|\/div|\/h\d|\/li|\/blockquote)[^>]*>/gi, ' $&').replace(/<img[^>]*>/gi, '');
   return d.textContent.replace(/\s+/g, ' ').trim();
 }
-function firstImg(html) { const m = html.match(/<img[^>]+src="(data:image\/[^"]+)"/i); return m ? m[1] : null; }
+const firstAsset = html => { const m = String(html).match(/data-asset="([A-Za-z0-9-]{8,64})"/); return m ? m[1] : null; };
 
 /* HTML sanitizer: 붙여넣기 등으로 들어오는 위험한 태그/속성 제거 */
 const ALLOWED = new Set(['P', 'DIV', 'BR', 'B', 'STRONG', 'I', 'EM', 'U', 'S', 'STRIKE', 'SPAN', 'FONT', 'H2', 'H3', 'BLOCKQUOTE', 'HR', 'UL', 'OL', 'LI', 'IMG', 'A']);
@@ -406,15 +551,22 @@ function sanitize(html) {
         const ok =
           (n === 'style' && !/url\s*\(|expression|javascript/i.test(v)) ||
           (n === 'color' && tag === 'FONT') || (n === 'size' && tag === 'FONT') ||
-          (n === 'src' && tag === 'IMG' && /^data:image\/(png|jpe?g|gif|webp);/i.test(v)) ||
+          (n === 'src' && tag === 'IMG' && /^blob:/i.test(v)) ||
+          (n === 'data-asset' && tag === 'IMG' && /^[A-Za-z0-9-]{8,64}$/.test(v)) ||
           (n === 'href' && tag === 'A' && /^https?:\/\//i.test(v));
         if (!ok) el.removeAttribute(a.name);
       });
-      if (tag === 'IMG' && !el.getAttribute('src')) el.remove();
+      if (tag === 'IMG' && !el.getAttribute('data-asset')) el.remove();
       if (tag === 'A') { el.setAttribute('target', '_blank'); el.setAttribute('rel', 'noopener noreferrer'); }
     });
   };
   walk(doc.body);
+  return doc.body.innerHTML;
+}
+/* 저장용: 화면 표시용 임시 주소(src)는 빼고 사진 id만 남김 */
+function toStored(html) {
+  const doc = new DOMParser().parseFromString('<body>' + sanitize(html) + '</body>', 'text/html');
+  doc.querySelectorAll('img[data-asset]').forEach(i => i.removeAttribute('src'));
   return doc.body.innerHTML;
 }
 
@@ -430,7 +582,7 @@ function resizeImage(file, max = 1280, q = 0.82) {
       ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h);
       ctx.drawImage(img, 0, 0, w, h);
       URL.revokeObjectURL(url);
-      res(c.toDataURL('image/jpeg', q));
+      c.toBlob(b => b ? res(b) : rej(new Error('이미지를 변환할 수 없어요')), 'image/jpeg', q);
     };
     img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('이미지를 불러올 수 없어요')); };
     img.src = url;
@@ -441,21 +593,30 @@ function resizeImage(file, max = 1280, q = 0.82) {
    Lock screen
    ========================================================= */
 let lockMode = 'unlock'; // 'setup' | 'unlock'
+let authCache = null;
 async function showLock() {
-  key = null; entries = [];
+  leaveEditor();
+  dek = null; entries = []; editorDirty = false; editorState = null;
+  clearImageCache();
   $('#app').classList.add('hidden');
   $('#view').innerHTML = '';
   closeSheet();
   $('#lock').classList.remove('hidden');
-  const meta = await getMeta();
-  lockMode = meta ? 'unlock' : 'setup';
+  const cloud = store.kind === 'cloud';
+  $('#lockBtn').disabled = true;
+  try { authCache = await store.getAuth(); }
+  catch (e) { $('#lockErr').textContent = '불러오지 못했어요: ' + errMsg(e); return; }
+  finally { $('#lockBtn').disabled = false; }
+  lockMode = authCache ? 'unlock' : 'setup';
   const setup = lockMode === 'setup';
   $('#lockTitle').textContent = setup ? '일기장 만들기' : '나의 일기';
   $('#lockSub').textContent = setup ? '일기장을 잠글 비밀번호를 정해 주세요' : '비밀번호를 입력해 주세요';
   $('#pw1').placeholder = setup ? '새 비밀번호 (4자 이상)' : '비밀번호';
   $('#pw1').autocomplete = setup ? 'new-password' : 'current-password';
   $('#pw2').classList.toggle('hidden', !setup);
-  $('#lockNote').classList.toggle('hidden', !setup);
+  $('#lockNote').innerHTML = setup
+    ? '⚠️ 비밀번호를 잊어버리면 일기를 복구할 수 없어요.<br>' + (cloud ? '일기는 이 비밀번호로 암호화되어 클라우드에 저장되고,<br>로그인한 어느 기기에서든 볼 수 있어요.' : '일기는 이 비밀번호로 암호화되어 이 기기에만 저장돼요.')
+    : (cloud ? '☁️ 클라우드에 저장된 일기장' : '📱 이 기기에 저장된 일기장');
   $('#lockBtn').textContent = setup ? '시작하기' : '열기';
   $('#lockErr').textContent = '';
   $('#pw1').value = ''; $('#pw2').value = '';
@@ -472,49 +633,44 @@ $('#lockForm').addEventListener('submit', async ev => {
   const label = btn.textContent;
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
   try {
-    key = lockMode === 'setup' ? await setupPassword(pw) : await unlock(pw);
-    if (!key) { err.textContent = '비밀번호가 맞지 않아요'; $('#pw1').select(); return; }
+    let raw;
+    if (lockMode === 'setup') {
+      // 다른 기기에서 먼저 만들었는지 한 번 더 확인
+      if (await store.getAuth()) { await showLock(); err.textContent = '다른 기기에서 이미 일기장을 만들었어요. 그 비밀번호로 열어 주세요.'; return; }
+      raw = crypto.getRandomValues(new Uint8Array(32));
+      await store.setAuth(await makeAuth(pw, raw));
+    } else {
+      raw = await openAuth(pw, authCache);
+      if (!raw) { err.textContent = '비밀번호가 맞지 않아요'; $('#pw1').select(); return; }
+    }
+    dek = await importDek(raw);
     await loadEntries();
     $('#lock').classList.add('hidden');
     $('#app').classList.remove('hidden');
     $('#pw1').value = ''; $('#pw2').value = '';
     route();
   } catch (e) {
-    console.error(e); err.textContent = '오류가 발생했어요: ' + e.message;
+    console.error(e); err.textContent = '오류가 발생했어요: ' + errMsg(e);
   } finally {
     btn.disabled = false; btn.textContent = label;
   }
 });
-$('#restoreLink').addEventListener('click', () => pickBackup());
 
-function pickBackup() {
-  const inp = $('#backupInput');
-  inp.value = '';
-  inp.onchange = async () => {
-    const f = inp.files[0]; if (!f) return;
-    const hasData = !!(await getMeta());
-    if (hasData && !(await ask('현재 이 기기의 일기가 모두 백업 파일 내용으로 바뀝니다.\n계속할까요?', { ok: '복원', danger: true }))) return;
-    try {
-      const n = await importBackup(f);
-      await showLock();
-      await notify(`${n}개의 일기를 복원했어요.\n백업할 당시의 비밀번호로 열어 주세요.`);
-    } catch (e) { notify('복원 실패: ' + e.message); }
-  };
-  inp.click();
-}
-
-/* 자동 잠금: 앱이 백그라운드에 5분 이상 있으면 잠금 */
+/* 자동 잠금 + 다른 기기에서 쓴 글 반영 */
 let hiddenAt = 0;
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden) hiddenAt = Date.now();
-  else if (key && hiddenAt && Date.now() - hiddenAt > AUTO_LOCK_MS && !isDirty()) showLock();
+document.addEventListener('visibilitychange', async () => {
+  if (document.hidden) { hiddenAt = Date.now(); return; }
+  if (!dek || editorDirty) return;
+  if (hiddenAt && Date.now() - hiddenAt > AUTO_LOCK_MS) { showLock(); return; }
+  if (store.kind === 'cloud' && !curHash.startsWith('#/edit') && !curHash.startsWith('#/write')) {
+    try { await loadEntries(); if (dek && !editorState) rerender(); } catch (_) {}
+  }
 });
 
 /* =========================================================
    Router
    ========================================================= */
 let curHash = '', editorDirty = false, editorState = null;
-const isDirty = () => editorDirty;
 window.addEventListener('hashchange', async () => {
   if (editorDirty && !location.hash.startsWith('#/edit') && !location.hash.startsWith('#/write')) {
     const target = location.hash;
@@ -528,17 +684,29 @@ window.addEventListener('beforeunload', e => { if (editorDirty) { e.preventDefau
 const go = h => { location.hash = h; };
 
 function route() {
-  if (!key) return;
-  editorDirty = false;
+  if (!dek) return;
+  leaveEditor();
   curHash = location.hash || '#/';
-  const [, a, b] = curHash.slice(1).split('/');
   closeSheet();
-  $('#editorToolbar').classList.add('hidden');
   window.scrollTo(0, 0);
+  rerender();
+}
+function rerender() {
+  const [, a, b] = curHash.slice(1).split('/');
+  $('#editorToolbar').classList.add('hidden');
   if (a === 'post' && b) showPost(decodeURIComponent(b));
   else if (a === 'write') showEditor(null, b);
   else if (a === 'edit' && b) showEditor(decodeURIComponent(b));
   else showList();
+}
+/* 편집기를 떠날 때: 저장하지 않은 글에 올렸던 사진 정리 */
+function leaveEditor() {
+  editorDirty = false;
+  if (!editorState) return;
+  const keep = new Set(editorState.savedHtml ? assetIds(editorState.savedHtml) : []);
+  if (editorState.old) assetIds(editorState.old.html).forEach(id => keep.add(id));
+  editorState.uploaded.filter(id => !keep.has(id)).forEach(id => store.delImage(id));
+  editorState = null;
 }
 
 /* =========================================================
@@ -565,7 +733,7 @@ function showList() {
     <div class="wrap">
       <div class="profile">
         <h2>오늘은 어떤 하루였나요?</h2>
-        <div class="stat">총 ${entries.length}개의 일기${first ? ` · ${fmtDate(first).slice(0, -4)}부터` : ''}</div>
+        <div class="stat">총 ${entries.length}개의 일기${first ? ` · ${fmtDate(first).slice(0, -4)}부터` : ''} · ${store.kind === 'cloud' ? '☁️ 모든 기기에서 동기화' : '📱 이 기기에 저장'}</div>
       </div>
       <div class="searchbar">${ICON.search}<input id="q" type="search" placeholder="일기 검색" value="${esc(listState.q)}"></div>
       ${cats.length ? `<div class="chips" id="chips">
@@ -600,7 +768,7 @@ function filtered() {
 function renderList() {
   const list = filtered();
   const df = $('#dayFilter');
-  df.innerHTML = listState.day ? `<div class="day-filter"><span>${fmtDate(listState.day)}의 일기</span><button id="clrDay">✕</button></div>` : '';
+  df.innerHTML = listState.day ? `<div class="day-filter"><span>${fmtDate(listState.day)}의 일기</span><button id="clrDay" aria-label="날짜 필터 해제">✕</button></div>` : '';
   if (listState.day) $('#clrDay').onclick = () => { listState.day = ''; renderCal(); renderList(); };
 
   if (!list.length) {
@@ -613,7 +781,7 @@ function renderList() {
   for (const e of list) {
     const d = parseYmd(e.date), mk = e.date.slice(0, 7);
     if (mk !== lastMonth) { html += `<div class="month-h">${d.getFullYear()}년 ${d.getMonth() + 1}월</div>`; lastMonth = mk; }
-    const ex = textOf(e.html).slice(0, 140), th = firstImg(e.html), wd = d.getDay();
+    const ex = textOf(e.html).slice(0, 140), th = firstAsset(e.html), wd = d.getDay();
     html += `<button class="post-card" data-id="${esc(e.id)}">
       <div class="pc-date"><div class="d">${d.getDate()}</div><div class="w ${wd === 0 ? 'sun' : wd === 6 ? 'sat' : ''}">${WD[wd]}${e.mood ? '<br>' + e.mood : ''}</div></div>
       <div class="pc-body">
@@ -621,10 +789,11 @@ function renderList() {
         <div class="pc-title">${esc(e.title || '제목 없음')}</div>
         ${ex ? `<div class="pc-ex">${esc(ex)}</div>` : ''}
       </div>
-      ${th ? `<img class="pc-thumb" src="${th}" alt="" loading="lazy">` : ''}
+      ${th ? `<img class="pc-thumb" data-asset="${th}" alt="">` : ''}
     </button>`;
   }
   $('#list').innerHTML = html;
+  hydrate($('#list'));
   $('#list').onclick = ev => { const c = ev.target.closest('.post-card'); if (c) go('#/post/' + encodeURIComponent(c.dataset.id)); };
 }
 function renderCal() {
@@ -642,17 +811,17 @@ function renderCal() {
     cells += `<button class="cal-day ${has.has(k) ? 'has' : ''} ${k === today ? 'today' : ''} ${k === listState.day ? 'sel' : ''}" data-d="${k}">${d}</button>`;
   }
   box.innerHTML = `<div class="cal">
-    <div class="cal-h"><button class="icon-btn" id="calPrev">‹</button><b>${y}년 ${m + 1}월</b><button class="icon-btn" id="calNext">›</button></div>
+    <div class="cal-h"><button class="icon-btn" id="calPrev" aria-label="이전 달">‹</button><b>${y}년 ${m + 1}월</b><button class="icon-btn" id="calNext" aria-label="다음 달">›</button></div>
     <div class="cal-grid">${cells}</div></div>`;
   $('#calPrev').onclick = () => { listState.calMonth = new Date(y, m - 1, 1); renderCal(); };
   $('#calNext').onclick = () => { listState.calMonth = new Date(y, m + 1, 1); renderCal(); };
   box.querySelector('.cal-grid').onclick = ev => {
     const b = ev.target.closest('.cal-day'); if (!b) return;
     const k = b.dataset.d;
-    if (listState.day === k) { listState.day = ''; }
-    else if (has.has(k)) { listState.day = k; }
-    else { listState.calMonth = new Date(y, m, 1); go('#/write/' + k); return; }
     listState.calMonth = new Date(y, m, 1);
+    if (listState.day === k) listState.day = '';
+    else if (has.has(k)) listState.day = k;
+    else { go('#/write/' + k); return; }
     renderCal(); renderList();
   };
 }
@@ -678,7 +847,7 @@ function showPost(id) {
         <h1>${esc(e.title || '제목 없음')}</h1>
         <div class="meta"><span>${fmtDate(e.date)}</span>${e.mood ? `<span class="mood">${e.mood}</span>` : ''}
           ${e.updatedAt && e.updatedAt - e.createdAt > 60000 ? `<span>· 수정됨</span>` : ''}</div>
-        <div class="content">${sanitize(e.html)}</div>
+        <div class="content" id="postContent">${sanitize(e.html)}</div>
         <div class="post-actions">
           <button class="btn btn-line btn-danger" id="delBtn">삭제</button>
           <button class="btn btn-line" id="editBtn">수정</button>
@@ -689,10 +858,12 @@ function showPost(id) {
         ${newer ? `<button data-id="${esc(newer.id)}"><small>다음 글 ›</small><span>${esc(newer.title || '제목 없음')}</span></button>` : '<div></div>'}
       </div>
     </div>`;
+  hydrate($('#postContent'));
   $('#editBtn').onclick = () => go('#/edit/' + encodeURIComponent(e.id));
   $('#delBtn').onclick = async () => {
     if (!(await ask('이 일기를 삭제할까요?\n삭제하면 되돌릴 수 없어요.', { ok: '삭제', danger: true }))) return;
-    await deleteEntry(e.id); toast('삭제했어요'); go('#/');
+    try { await deleteEntry(e.id); toast('삭제했어요'); go('#/'); }
+    catch (err) { notify('삭제하지 못했어요: ' + errMsg(err)); }
   };
   document.querySelectorAll('.post-nav button').forEach(b => b.onclick = () => go('#/post/' + encodeURIComponent(b.dataset.id)));
 }
@@ -726,7 +897,7 @@ function updateEmpty() {
 function showEditor(id, presetDate) {
   const e = id ? entries.find(x => x.id === id) : null;
   if (id && !e) { go('#/'); return; }
-  editorState = { id: e ? e.id : null, mood: e ? e.mood || '' : '' };
+  editorState = { id: e ? e.id : null, old: e || null, mood: e ? e.mood || '' : '', uploaded: [], savedHtml: null };
   savedRange = null;
   const date = e ? e.date : (/^\d{4}-\d{2}-\d{2}$/.test(presetDate || '') ? presetDate : ymd(new Date()));
 
@@ -746,7 +917,7 @@ function showEditor(id, presetDate) {
     <button class="tb" data-cmd="italic" aria-label="기울임"><i style="font-family:serif">I</i></button>
     <button class="tb" data-cmd="underline" aria-label="밑줄"><u>U</u></button>
     <button class="tb" data-cmd="strikeThrough" aria-label="취소선"><s>S</s></button>
-    <button class="tb" id="colorBtn" aria-label="글자색"><span style="border-bottom:3px solid #e5484d;line-height:1.1;font-weight:700">A</span></button>
+    <button class="tb" id="colorBtn" aria-label="글자색"><span style="border-bottom:3px solid var(--danger);line-height:1.1;font-weight:700">A</span></button>
     <span class="tb-sep"></span>
     <button class="tb" data-cmd="justifyLeft" aria-label="왼쪽 정렬"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 10h10M4 14h16M4 18h10"/></svg></button>
     <button class="tb" data-cmd="justifyCenter" aria-label="가운데 정렬"><svg viewBox="0 0 24 24"><path d="M4 6h16M7 10h10M4 14h16M7 18h10"/></svg></button>
@@ -774,6 +945,7 @@ function showEditor(id, presetDate) {
 
   const ed = $('#edBody');
   ed.innerHTML = e ? sanitize(e.html) : '';
+  hydrate(ed);
   try { document.execCommand('defaultParagraphSeparator', false, 'p'); } catch (_) {}
   updateEmpty();
 
@@ -808,6 +980,7 @@ function showEditor(id, presetDate) {
   $('#blockSel').onchange = ev => { exec('formatBlock', '<' + ev.target.value + '>'); };
   $('#colorBtn').onclick = ev => toggleColorPop(ev.currentTarget);
   $('#imgBtn').onclick = () => {
+    if (!store.canImages) { toast('이 화면에서는 사진을 올릴 수 없어요'); return; }
     const inp = $('#imgInput'); inp.value = '';
     inp.onchange = () => insertImages([...inp.files]);
     inp.click();
@@ -855,26 +1028,39 @@ function toggleColorPop(btn) {
   };
   setTimeout(() => document.addEventListener('click', off), 0);
 }
+let uploading = 0;
 async function insertImages(files) {
   files = files.filter(f => f.type.startsWith('image/') || /\.(heic|heif)$/i.test(f.name));
-  if (!files.length) return;
-  toast(files.length > 1 ? `사진 ${files.length}장을 넣는 중...` : '사진을 넣는 중...');
-  for (const f of files) {
-    try {
-      const src = await resizeImage(f);
-      exec('insertHTML', `<p><img src="${src}" alt=""></p><p><br></p>`);
-    } catch (e) { toast(e.message); }
-  }
+  if (!files.length || !editorState) return;
+  const st = editorState;
+  uploading++;
+  try {
+    let i = 0;
+    for (const f of files) {
+      i++;
+      toast(files.length > 1 ? `사진 올리는 중... ${i}/${files.length}` : '사진 올리는 중...', 60000);
+      try {
+        const blob = await resizeImage(f);
+        const id = await uploadImage(blob);
+        st.uploaded.push(id);
+        if (editorState !== st) continue; // 편집기를 이미 떠남
+        const url = await imageURL(id);
+        exec('insertHTML', `<p><img data-asset="${id}" src="${url}" alt=""></p><p><br></p>`);
+      } catch (e) { toast('사진을 넣지 못했어요: ' + errMsg(e), 3000); return; }
+    }
+    toast(files.length > 1 ? `사진 ${files.length}장을 넣었어요` : '사진을 넣었어요');
+  } finally { uploading--; }
 }
 async function saveEditor() {
+  if (uploading) { toast('사진을 올리는 중이에요. 잠시만 기다려 주세요'); return; }
   const ed = $('#edBody');
   const title = $('#edTitle').value.trim();
-  const html = sanitize(ed.innerHTML);
+  const html = toStored(ed.innerHTML);
   const date = $('#edDate').value;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { toast('날짜를 선택해 주세요'); return; }
   if (!title && !textOf(html) && !/<img/i.test(html)) { toast('내용을 입력해 주세요'); return; }
   const now = Date.now();
-  const old = editorState.id ? entries.find(x => x.id === editorState.id) : null;
+  const old = editorState.old;
   const entry = {
     id: old ? old.id : uid(),
     date, title, html,
@@ -886,6 +1072,11 @@ async function saveEditor() {
   const btn = $('#saveBtn'); btn.disabled = true; btn.textContent = '저장 중';
   try {
     await saveEntry(entry);
+    // 수정하면서 지운 사진은 저장소에서도 삭제
+    const keep = new Set(assetIds(html));
+    if (old) assetIds(old.html).filter(a => !keep.has(a)).forEach(a => store.delImage(a));
+    editorState.old = null;
+    editorState.savedHtml = html;
     editorDirty = false;
     toast('저장했어요');
     // 작성 화면을 히스토리에서 대체해서 뒤로가기 시 다시 편집기로 돌아오지 않게
@@ -893,7 +1084,7 @@ async function saveEditor() {
     route();
   } catch (e) {
     console.error(e);
-    notify('저장하지 못했어요: ' + e.message);
+    notify('저장하지 못했어요: ' + errMsg(e));
     btn.disabled = false; btn.textContent = '저장';
   }
 }
@@ -912,23 +1103,44 @@ function openSheet(html) {
   return o;
 }
 async function openMenu() {
-  let usage = '';
-  try { const est = await navigator.storage.estimate(); usage = `사용 중인 저장공간 약 ${(est.usage / 1048576).toFixed(1)}MB`; } catch (_) {}
+  const cloud = store.kind === 'cloud';
   const o = openSheet(`
     <h3>메뉴</h3>
     <button class="item" data-a="lock"><span class="ic">🔒</span><div>지금 잠그기<small>다시 열려면 비밀번호가 필요해요</small></div></button>
-    <button class="item" data-a="pw"><span class="ic">🔑</span><div>비밀번호 변경</div></button>
-    <button class="item" data-a="export"><span class="ic">💾</span><div>백업 파일 저장<small>암호화된 파일로 저장돼요. 기기를 바꿀 때 사용하세요</small></div></button>
-    <button class="item" data-a="import"><span class="ic">📂</span><div>백업 파일에서 복원<small>현재 일기는 백업 내용으로 바뀌어요</small></div></button>
-    <p style="color:var(--text3);font-size:12px;margin-top:12px">${usage ? usage + ' · ' : ''}일기는 이 브라우저에 암호화되어 저장됩니다. 브라우저 데이터를 지우면 함께 지워지니 가끔 백업해 두세요.</p>`);
+    <button class="item" data-a="pw"><span class="ic">🔑</span><div>비밀번호 변경${cloud ? '<small>모든 기기에 함께 적용돼요</small>' : ''}</div></button>
+    <button class="item" data-a="export"><span class="ic">💾</span><div>백업 파일 저장<small>암호화된 파일로 저장돼요</small></div></button>
+    <button class="item" data-a="import"><span class="ic">📂</span><div>백업 파일 가져오기<small>백업의 일기를 지금 일기장에 합쳐요</small></div></button>
+    <p style="color:var(--text3);font-size:12px;margin-top:12px" id="usageNote">${cloud
+      ? '☁️ 일기는 암호화되어 클라우드의 본인 전용 공간에 저장돼요. 이 링크로 로그인한 어느 기기에서든 같은 일기를 볼 수 있어요.'
+      : '📱 일기는 이 브라우저에 암호화되어 저장돼요. 브라우저 데이터를 지우면 함께 지워지니 가끔 백업해 두세요.'}</p>`);
+  store.usage().then(u => { const n = o.querySelector('#usageNote'); if (u && n) n.textContent += ' ' + u; });
   o.querySelector('.sheet').onclick = async ev => {
     const b = ev.target.closest('.item'); if (!b) return;
     const a = b.dataset.a;
     if (a === 'lock') showLock();
     else if (a === 'pw') openPwSheet();
-    else if (a === 'export') { closeSheet(); try { await exportBackup(); toast('백업 파일을 저장했어요'); } catch (e) { notify('백업 실패: ' + e.message); } }
+    else if (a === 'export') {
+      closeSheet(); toast('백업 파일을 만드는 중...', 10000);
+      try { const st = await exportBackup(); if (st === 'saved') toast('백업 파일을 저장했어요'); else toast('백업 파일을 보냈어요'); }
+      catch (e) { if (e && e.code === 'declined') toast('저장을 취소했어요'); else notify('백업 실패: ' + errMsg(e)); }
+    }
     else if (a === 'import') { closeSheet(); pickBackup(); }
   };
+}
+function pickBackup() {
+  const inp = $('#backupInput');
+  inp.value = '';
+  inp.onchange = async () => {
+    const f = inp.files[0]; if (!f) return;
+    let data;
+    try { data = JSON.parse(await f.text()); } catch (_) { notify('백업 파일을 읽을 수 없어요'); return; }
+    if (data.app !== 'secret-diary' || data.v !== 2 || !data.auth || !Array.isArray(data.entries)) { notify('이 앱의 백업 파일이 아니에요'); return; }
+    const pw = await askPassword(`백업 파일에 일기 ${data.entries.length}개가 있어요.\n백업할 당시의 비밀번호를 입력해 주세요.`);
+    if (pw == null) return;
+    try { const n = await importBackup(data, pw); toast(`일기 ${n}개를 가져왔어요`); rerender(); }
+    catch (e) { notify('가져오기 실패: ' + errMsg(e)); }
+  };
+  inp.click();
 }
 function openPwSheet() {
   const o = openSheet(`
@@ -947,8 +1159,12 @@ function openPwSheet() {
     if (n1.length < 4) { err.textContent = '새 비밀번호는 4자 이상이어야 해요'; return; }
     if (n1 !== n2) { err.textContent = '새 비밀번호가 서로 달라요'; return; }
     const btn = o.querySelector('#pwOk'); btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
-    try { await changePassword(o.querySelector('#opw').value, n1); closeSheet(); toast('비밀번호를 변경했어요'); }
-    catch (e) { err.textContent = e.message; btn.disabled = false; btn.textContent = '변경'; }
+    try {
+      const raw = await openAuth(o.querySelector('#opw').value, await store.getAuth());
+      if (!raw) throw new Error('현재 비밀번호가 맞지 않아요');
+      await store.setAuth(await makeAuth(n1, raw));
+      closeSheet(); toast('비밀번호를 변경했어요');
+    } catch (e) { err.textContent = errMsg(e); btn.disabled = false; btn.textContent = '변경'; }
   };
   setTimeout(() => o.querySelector('#opw').focus(), 50);
 }
@@ -957,12 +1173,17 @@ function openPwSheet() {
    Boot
    ========================================================= */
 (async () => {
-  if (!window.crypto || !crypto.subtle || !window.indexedDB) {
-    document.body.innerHTML = '<div class="empty" style="padding:40px 16px">이 브라우저에서는 사용할 수 없어요.<br>최신 Chrome / Safari에서 https 주소로 열어 주세요.</div>';
+  const fail = msg => { $('#lock').classList.remove('hidden'); $('#lockForm').innerHTML = `<div class="lock-icon">⚠️</div><p class="sub" style="margin-top:14px">${msg}</p><button type="button" class="btn btn-primary" onclick="location.reload()">다시 시도</button>`; };
+  if (!window.crypto || !crypto.subtle) { fail('이 브라우저에서는 사용할 수 없어요.<br>최신 Chrome / Safari에서 https 주소로 열어 주세요.'); return; }
+  $('#lock').classList.remove('hidden');
+  $('#lockSub').textContent = '일기장을 여는 중...';
+  try { store = await pickStore(); }
+  catch (e) {
+    fail(e.message === 'cloud'
+      ? '클라우드 저장소에 연결할 수 없어요.<br>claude.ai에 로그인했는지 확인한 뒤 다시 시도해 주세요.'
+      : '저장소를 열 수 없어요.<br>사생활 보호 모드에서는 동작하지 않을 수 있어요.');
     return;
   }
-  try { db = await openDB(); }
-  catch (e) { document.body.innerHTML = '<div class="empty" style="padding:40px 16px">저장소를 열 수 없어요. (사생활 보호 모드에서는 동작하지 않을 수 있어요)</div>'; return; }
   history.replaceState(null, '', '#/');
   showLock();
 })();
