@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#16181c" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="나의 일기">
+<meta name="robots" content="noindex,nofollow">
+<title>나의 일기</title>
+<style>
+:root{
+  --bg:#f5f6f8; --card:#ffffff; --text:#1e1f23; --text2:#6b7079; --text3:#9aa0a8;
+  --line:#e6e8eb; --accent:#03a94e; --accent-soft:#e7f7ee; --danger:#e5484d;
+  --shadow:0 1px 3px rgba(0,0,0,.06),0 4px 14px rgba(0,0,0,.04);
+  --safe-b:env(safe-area-inset-bottom,0px); --safe-t:env(safe-area-inset-top,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#16181c; --card:#1f2228; --text:#e9eaec; --text2:#a3a8b0; --text3:#6f757e;
+    --line:#2d3139; --accent:#2fc174; --accent-soft:#1d3428; --danger:#ff6369;
+    --shadow:0 1px 3px rgba(0,0,0,.4);
+  }
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif;font-size:15px;line-height:1.6;-webkit-text-size-adjust:100%}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+input,select,textarea{font:inherit;color:inherit;font-size:16px}
+.hidden{display:none!important}
+.wrap{max-width:760px;margin:0 auto;padding:0 16px}
+
+/* ---------- Lock screen ---------- */
+#lock{min-height:100%;display:flex;align-items:center;justify-content:center;padding:24px 16px}
+.lock-box{width:100%;max-width:360px;background:var(--card);border-radius:20px;box-shadow:var(--shadow);padding:36px 24px 28px;text-align:center}
+.lock-icon{font-size:44px;line-height:1}
+.lock-box h1{font-size:22px;margin:12px 0 4px}
+.lock-box p.sub{color:var(--text2);font-size:14px;margin-bottom:22px}
+.field{width:100%;padding:14px 16px;border:1.5px solid var(--line);border-radius:12px;background:var(--bg);outline:none;margin-bottom:10px;transition:border-color .15s}
+.field:focus{border-color:var(--accent)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:12px 18px;border-radius:12px;font-weight:600;font-size:15px}
+.btn-primary{background:var(--accent);color:#fff;width:100%;padding:14px}
+.btn-primary:disabled{opacity:.6}
+.btn-ghost{color:var(--text2)}
+.btn-line{border:1.5px solid var(--line);background:var(--card)}
+.btn-danger{color:var(--danger)}
+.lock-err{color:var(--danger);font-size:13px;min-height:20px;margin:2px 0 6px}
+.lock-note{color:var(--text3);font-size:12px;margin-top:16px;line-height:1.5}
+.lock-link{color:var(--text2);font-size:13px;margin-top:14px;text-decoration:underline}
+
+/* ---------- Header ---------- */
+header.top{position:sticky;top:0;z-index:20;background:var(--card);background:color-mix(in srgb,var(--card) 92%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line);padding-top:var(--safe-t)}
+header.top .wrap{display:flex;align-items:center;gap:8px;height:56px}
+.brand{font-size:19px;font-weight:800;letter-spacing:-.3px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.brand small{font-weight:500;color:var(--text3);font-size:13px;margin-left:6px}
+.icon-btn{width:40px;height:40px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;font-size:19px;flex:none}
+.icon-btn:active,.icon-btn.on{background:var(--accent-soft)}
+.icon-btn svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+/* ---------- List ---------- */
+.profile{padding:22px 0 8px}
+.profile h2{font-size:20px;letter-spacing:-.3px}
+.profile .stat{color:var(--text2);font-size:13px;margin-top:2px}
+.searchbar{display:flex;align-items:center;gap:8px;background:var(--card);border:1.5px solid var(--line);border-radius:12px;padding:0 12px;margin:12px 0}
+.searchbar svg{width:18px;height:18px;stroke:var(--text3);fill:none;stroke-width:2;flex:none}
+.searchbar input{flex:1;border:none;background:none;outline:none;padding:11px 0;min-width:0}
+.chips{display:flex;gap:6px;overflow-x:auto;padding:2px 0 10px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;padding:6px 13px;border-radius:999px;border:1.5px solid var(--line);background:var(--card);font-size:13px;color:var(--text2);white-space:nowrap}
+.chip.on{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);font-weight:600}
+.day-filter{display:flex;align-items:center;justify-content:space-between;background:var(--accent-soft);color:var(--accent);border-radius:10px;padding:8px 12px;font-size:14px;font-weight:600;margin-bottom:10px}
+
+.month-h{font-size:13px;font-weight:700;color:var(--text2);margin:18px 2px 8px;display:flex;align-items:center;gap:8px}
+.month-h::after{content:"";flex:1;height:1px;background:var(--line)}
+.post-card{display:flex;gap:14px;background:var(--card);border-radius:14px;padding:16px;margin-bottom:10px;box-shadow:var(--shadow);cursor:pointer;transition:transform .1s;text-align:left;width:100%}
+.post-card:active{transform:scale(.99)}
+.pc-date{flex:none;width:44px;text-align:center;line-height:1.15;padding-top:2px}
+.pc-date .d{font-size:22px;font-weight:800}
+.pc-date .w{font-size:12px;color:var(--text3)}
+.pc-date .w.sun{color:#e5484d}.pc-date .w.sat{color:#3e7bfa}
+.pc-body{flex:1;min-width:0}
+.pc-cat{font-size:12px;color:var(--accent);font-weight:600;margin-bottom:2px}
+.pc-title{font-size:16px;font-weight:700;letter-spacing:-.2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pc-ex{font-size:14px;color:var(--text2);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-top:3px;word-break:break-all}
+.pc-thumb{flex:none;width:84px;height:84px;border-radius:10px;object-fit:cover;background:var(--line)}
+.empty{text-align:center;color:var(--text3);padding:60px 0;font-size:14px}
+.empty .big{font-size:40px;margin-bottom:8px}
+
+/* Calendar */
+.cal{background:var(--card);border-radius:14px;box-shadow:var(--shadow);padding:12px;margin:4px 0 10px}
+.cal-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.cal-h b{font-size:16px}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);text-align:center;gap:2px}
+.cal-grid .wd{font-size:12px;color:var(--text3);padding:4px 0}
+.cal-grid .wd:first-child{color:#e5484d}.cal-grid .wd:last-child{color:#3e7bfa}
+.cal-day{position:relative;aspect-ratio:1/1;max-height:48px;border-radius:10px;font-size:14px;display:flex;align-items:center;justify-content:center;width:100%}
+.cal-day.today{font-weight:800;color:var(--accent)}
+.cal-day.has::after{content:"";position:absolute;bottom:5px;left:50%;width:5px;height:5px;margin-left:-2.5px;border-radius:50%;background:var(--accent)}
+.cal-day.sel{background:var(--accent);color:#fff}
+.cal-day.sel::after{background:#fff}
+
+.fab{position:fixed;right:max(18px,calc(50% - 362px));bottom:calc(20px + var(--safe-b));width:58px;height:58px;border-radius:50%;background:var(--accent);color:#fff;box-shadow:0 6px 18px rgba(3,169,78,.35);display:flex;align-items:center;justify-content:center;z-index:15}
+.fab svg{width:26px;height:26px;stroke:#fff;stroke-width:2.4;fill:none;stroke-linecap:round}
+
+/* ---------- Post view ---------- */
+.post{background:var(--card);margin:14px 0 24px;border-radius:16px;box-shadow:var(--shadow);padding:26px 20px 30px}
+.post .cat{color:var(--accent);font-weight:600;font-size:14px}
+.post h1{font-size:24px;line-height:1.35;letter-spacing:-.4px;margin:6px 0 10px;word-break:keep-all;overflow-wrap:anywhere}
+.post .meta{color:var(--text3);font-size:13px;padding-bottom:18px;border-bottom:1px solid var(--line);display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.post .meta .mood{font-size:18px}
+.content{font-size:16px;line-height:1.8;padding-top:20px;overflow-wrap:anywhere}
+.content p,.content div{min-height:1em}
+.content img{max-width:100%;height:auto;border-radius:8px;display:block;margin:10px auto}
+.content blockquote{border-left:4px solid var(--accent);background:var(--bg);padding:10px 16px;margin:12px 0;border-radius:0 8px 8px 0;color:var(--text2)}
+.content hr{border:none;border-top:1px solid var(--line);margin:22px 0}
+.content h2{font-size:22px;margin:16px 0 6px;line-height:1.4}
+.content h3{font-size:18px;margin:14px 0 4px;line-height:1.4}
+.content ul,.content ol{padding-left:24px;margin:6px 0}
+.content a{color:var(--accent)}
+.post-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:26px;padding-top:16px;border-top:1px solid var(--line)}
+.post-nav{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:30px}
+.post-nav button{background:var(--card);border-radius:12px;padding:12px 14px;text-align:left;box-shadow:var(--shadow);min-width:0}
+.post-nav button:last-child{text-align:right}
+.post-nav small{color:var(--text3);font-size:12px;display:block}
+.post-nav span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;font-size:14px}
+
+/* ---------- Editor ---------- */
+#editorView{min-height:100%;background:var(--card)}
+.ed-toolbar{position:sticky;top:calc(56px + var(--safe-t));z-index:19;background:var(--card);border-bottom:1px solid var(--line)}
+.ed-toolbar .wrap{display:flex;align-items:center;gap:2px;overflow-x:auto;height:48px;scrollbar-width:none;padding:0 10px}
+.ed-toolbar .wrap::-webkit-scrollbar{display:none}
+.tb{flex:none;min-width:38px;height:38px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-size:16px;padding:0 6px}
+.tb:active,.tb.on{background:var(--accent-soft);color:var(--accent)}
+.tb svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.tb-sep{flex:none;width:1px;height:22px;background:var(--line);margin:0 4px}
+.tb-sel{flex:none;height:34px;border:1px solid var(--line);border-radius:8px;background:var(--card);padding:0 6px;font-size:14px}
+.color-pop{position:absolute;top:50px;z-index:30;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.15);padding:10px;display:grid;grid-template-columns:repeat(5,30px);gap:8px}
+.color-pop button{width:30px;height:30px;border-radius:50%;border:2px solid var(--line)}
+.ed-meta{display:flex;flex-wrap:wrap;gap:8px;padding:16px 0 4px}
+.ed-meta input,.ed-meta select{border:1.5px solid var(--line);border-radius:10px;background:var(--bg);padding:8px 10px;outline:none;min-width:0}
+.ed-meta input[type=date]{flex:0 1 170px}
+.ed-meta .cat-in{flex:1 1 140px}
+.moods{display:flex;gap:4px;flex-wrap:wrap;padding:8px 0}
+.moods button{width:40px;height:40px;border-radius:10px;font-size:22px;border:1.5px solid transparent}
+.moods button.on{border-color:var(--accent);background:var(--accent-soft)}
+.ed-title{width:100%;border:none;outline:none;background:none;font-size:24px!important;font-weight:700;letter-spacing:-.4px;padding:12px 0;border-bottom:1px solid var(--line)}
+.ed-title::placeholder{color:var(--text3)}
+.ed-body{min-height:50vh;outline:none;padding:18px 0 140px;font-size:16px;line-height:1.8;overflow-wrap:anywhere}
+.ed-body.is-empty::before{content:attr(data-ph);color:var(--text3);pointer-events:none;position:absolute}
+.save-btn{background:var(--accent);color:#fff;padding:8px 16px;border-radius:10px;font-weight:700;font-size:15px;flex:none}
+
+/* ---------- Sheet / modal ---------- */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:50;display:flex;align-items:flex-end;justify-content:center;animation:fade .15s}
+.sheet{width:100%;max-width:520px;background:var(--card);border-radius:20px 20px 0 0;padding:10px 16px calc(20px + var(--safe-b));animation:up .2s ease-out;max-height:90vh;overflow:auto}
+@media (min-width:600px){.overlay{align-items:center}.sheet{border-radius:20px}}
+.sheet .grab{width:40px;height:4px;border-radius:2px;background:var(--line);margin:0 auto 14px}
+.sheet h3{font-size:18px;margin-bottom:12px}
+.sheet .item{display:flex;align-items:center;gap:12px;width:100%;padding:14px 6px;border-bottom:1px solid var(--line);text-align:left;font-size:15px}
+.sheet .item:last-child{border-bottom:none}
+.sheet .item .ic{font-size:20px;width:28px;text-align:center}
+.sheet .item small{display:block;color:var(--text3);font-size:12px}
+.sheet .row{display:flex;gap:8px;margin-top:8px}
+.sheet .row .btn{flex:1}
+@keyframes fade{from{opacity:0}}
+@keyframes up{from{transform:translateY(40px);opacity:.5}}
+
+.toast{position:fixed;left:50%;bottom:calc(96px + var(--safe-b));transform:translateX(-50%);background:rgba(30,31,35,.92);color:#fff;padding:10px 18px;border-radius:999px;font-size:14px;z-index:100;max-width:calc(100% - 32px);text-align:center;animation:fade .2s}
+.spinner{width:18px;height:18px;border:2.5px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<!-- ================= LOCK ================= -->
+<section id="lock" class="hidden">
+  <form class="lock-box" id="lockForm" autocomplete="off">
+    <div class="lock-icon">🔒</div>
+    <h1 id="lockTitle">나의 일기</h1>
+    <p class="sub" id="lockSub">비밀번호를 입력해 주세요</p>
+    <input class="field" type="password" id="pw1" placeholder="비밀번호" autocomplete="current-password" inputmode="text">
+    <input class="field hidden" type="password" id="pw2" placeholder="비밀번호 확인" autocomplete="new-password">
+    <div class="lock-err" id="lockErr"></div>
+    <button class="btn btn-primary" id="lockBtn" type="submit">열기</button>
+    <p class="lock-note hidden" id="lockNote">⚠️ 비밀번호를 잊어버리면 일기를 복구할 수 없어요.<br>일기는 이 비밀번호로 암호화되어 이 기기에만 저장됩니다.</p>
+    <button type="button" class="lock-link" id="restoreLink">백업 파일에서 복원하기</button>
+  </form>
+</section>
+
+<!-- ================= APP ================= -->
+<section id="app" class="hidden">
+  <header class="top">
+    <div class="wrap" id="headerBar"></div>
+  </header>
+  <div id="editorToolbar" class="ed-toolbar hidden"></div>
+  <main id="view"></main>
+</section>
+
+<input type="file" id="imgInput" accept="image/*" multiple class="hidden">
+<input type="file" id="backupInput" accept=".json,application/json" class="hidden">
+
+<script>
+'use strict';
+/* =========================================================
+   Storage (IndexedDB) + Crypto (PBKDF2 → AES-GCM)
+   모든 일기는 비밀번호에서 유도한 키로 암호화되어 저장됩니다.
+   ========================================================= */
+const DB_NAME = 'secret-diary', DB_VER = 1, ITER = 250000;
+const AUTO_LOCK_MS = 5 * 60 * 1000;
+const te = new TextEncoder(), td = new TextDecoder();
+let db = null, key = null, entries = [];
+
+function openDB() {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open(DB_NAME, DB_VER);
+    r.onupgradeneeded = () => {
+      const d = r.result;
+      d.createObjectStore('meta');
+      d.createObjectStore('entries', { keyPath: 'id' });
+    };
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+}
+function tx(stores, mode, fn) {
+  return new Promise((res, rej) => {
+    const t = db.transaction(stores, mode);
+    let out;
+    const r = fn(t);
+    if (r && 'onsuccess' in r) r.onsuccess = () => { out = r.result; };
+    t.oncomplete = () => res(out);
+    t.onerror = () => rej(t.error);
+    t.onabort = () => rej(t.error || new Error('저장 공간이 부족할 수 있어요'));
+  });
+}
+const getMeta = () => tx('meta', 'readonly', t => t.objectStore('meta').get('auth'));
+const getAllRaw = () => tx('entries', 'readonly', t => t.objectStore('entries').getAll());
+
+async function deriveKey(pw, salt) {
+  const base = await crypto.subtle.importKey('raw', te.encode(pw), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations: ITER, hash: 'SHA-256' },
+    base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+}
+async function encryptObj(k, obj) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, k, te.encode(JSON.stringify(obj)));
+  return { iv, ct: new Uint8Array(ct) };
+}
+async function decryptObj(k, rec) {
+  const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: rec.iv }, k, rec.ct);
+  return JSON.parse(td.decode(pt));
+}
+const b64 = u8 => { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
+const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
+
+async function setupPassword(pw) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const k = await deriveKey(pw, salt);
+  const check = await encryptObj(k, 'diary-ok');
+  await tx('meta', 'readwrite', t => t.objectStore('meta').put({ salt, check }, 'auth'));
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+  return k;
+}
+async function unlock(pw) {
+  const meta = await getMeta();
+  const k = await deriveKey(pw, meta.salt);
+  try { if (await decryptObj(k, meta.check) !== 'diary-ok') return null; } catch (e) { return null; }
+  return k;
+}
+async function loadEntries() {
+  const raw = await getAllRaw();
+  const out = [];
+  for (const r of raw) {
+    try { out.push(Object.assign(await decryptObj(key, r), { id: r.id })); } catch (e) { console.warn('decrypt fail', r.id); }
+  }
+  entries = out;
+  sortEntries();
+}
+function sortEntries() {
+  entries.sort((a, b) => (b.date.localeCompare(a.date)) || (b.createdAt - a.createdAt));
+}
+async function saveEntry(e) {
+  const { id, ...data } = e;
+  const enc = await encryptObj(key, data);
+  await tx('entries', 'readwrite', t => t.objectStore('entries').put({ id, ...enc }));
+  const i = entries.findIndex(x => x.id === id);
+  if (i >= 0) entries[i] = e; else entries.push(e);
+  sortEntries();
+}
+async function deleteEntry(id) {
+  await tx('entries', 'readwrite', t => t.objectStore('entries').delete(id));
+  entries = entries.filter(x => x.id !== id);
+}
+async function changePassword(oldPw, newPw) {
+  if (!(await unlock(oldPw))) throw new Error('현재 비밀번호가 맞지 않아요');
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const k = await deriveKey(newPw, salt);
+  const check = await encryptObj(k, 'diary-ok');
+  const recs = [];
+  for (const e of entries) { const { id, ...d } = e; recs.push({ id, ...(await encryptObj(k, d)) }); }
+  await tx(['meta', 'entries'], 'readwrite', t => {
+    t.objectStore('meta').put({ salt, check }, 'auth');
+    const s = t.objectStore('entries');
+    recs.forEach(r => s.put(r));
+  });
+  key = k;
+}
+async function exportBackup() {
+  const meta = await getMeta();
+  const raw = await getAllRaw();
+  const data = {
+    app: 'secret-diary', v: 1, exportedAt: new Date().toISOString(),
+    salt: b64(meta.salt), check: { iv: b64(meta.check.iv), ct: b64(meta.check.ct) },
+    entries: raw.map(r => ({ id: r.id, iv: b64(r.iv), ct: b64(r.ct) }))
+  };
+  const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `diary-backup-${ymd(new Date())}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+async function importBackup(file) {
+  const data = JSON.parse(await file.text());
+  if (data.app !== 'secret-diary' || !data.salt || !data.check || !Array.isArray(data.entries)) throw new Error('올바른 백업 파일이 아니에요');
+  const meta = { salt: unb64(data.salt), check: { iv: unb64(data.check.iv), ct: unb64(data.check.ct) } };
+  const recs = data.entries.map(r => ({ id: r.id, iv: unb64(r.iv), ct: unb64(r.ct) }));
+  await tx(['meta', 'entries'], 'readwrite', t => {
+    t.objectStore('meta').put(meta, 'auth');
+    const s = t.objectStore('entries');
+    s.clear();
+    recs.forEach(r => s.put(r));
+  });
+  return recs.length;
+}
+
+/* =========================================================
+   Helpers
+   ========================================================= */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const pad = n => String(n).padStart(2, '0');
+const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const WD = ['일', '월', '화', '수', '목', '금', '토'];
+const parseYmd = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const fmtDate = s => { const d = parseYmd(s); return `${d.getFullYear()}. ${d.getMonth() + 1}. ${d.getDate()}. (${WD[d.getDay()]})`; };
+const MOODS = ['😊', '🥰', '😆', '😌', '😐', '😢', '😡', '😴', '🤒'];
+const ICON = {
+  menu: '<svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>',
+  cal: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
+  back: '<svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>',
+  plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
+  search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
+  lock: '<svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>',
+};
+
+function toast(msg, ms = 2200) {
+  document.querySelectorAll('.toast').forEach(x => x.remove());
+  const t = document.createElement('div');
+  t.className = 'toast'; t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), ms);
+}
+function textOf(html) {
+  const d = document.createElement('div');
+  d.innerHTML = html.replace(/<(br|\/p|\/div|\/h\d|\/li|\/blockquote)[^>]*>/gi, ' $&');
+  d.querySelectorAll('img').forEach(i => i.remove());
+  return d.textContent.replace(/\s+/g, ' ').trim();
+}
+function firstImg(html) { const m = html.match(/<img[^>]+src="(data:image\/[^"]+)"/i); return m ? m[1] : null; }
+
+/* HTML sanitizer: 붙여넣기 등으로 들어오는 위험한 태그/속성 제거 */
+const ALLOWED = new Set(['P', 'DIV', 'BR', 'B', 'STRONG', 'I', 'EM', 'U', 'S', 'STRIKE', 'SPAN', 'FONT', 'H2', 'H3', 'BLOCKQUOTE', 'HR', 'UL', 'OL', 'LI', 'IMG', 'A']);
+const DROP = new Set(['SCRIPT', 'STYLE', 'IFRAME', 'OBJECT', 'EMBED', 'LINK', 'META', 'TEMPLATE', 'SVG', 'MATH', 'FORM', 'INPUT', 'BUTTON', 'TEXTAREA', 'SELECT', 'NOSCRIPT', 'TITLE', 'HEAD']);
+function sanitize(html) {
+  const doc = new DOMParser().parseFromString('<body>' + html + '</body>', 'text/html');
+  const walk = node => {
+    [...node.children].forEach(el => {
+      const tag = el.tagName.toUpperCase();
+      if (DROP.has(tag)) { el.remove(); return; }
+      walk(el);
+      if (!ALLOWED.has(tag)) { el.replaceWith(...el.childNodes); return; }
+      [...el.attributes].forEach(a => {
+        const n = a.name.toLowerCase(), v = a.value;
+        const ok =
+          (n === 'style' && !/url\s*\(|expression|javascript/i.test(v)) ||
+          (n === 'color' && tag === 'FONT') || (n === 'size' && tag === 'FONT') ||
+          (n === 'src' && tag === 'IMG' && /^data:image\/(png|jpe?g|gif|webp);/i.test(v)) ||
+          (n === 'href' && tag === 'A' && /^https?:\/\//i.test(v));
+        if (!ok) el.removeAttribute(a.name);
+      });
+      if (tag === 'IMG' && !el.getAttribute('src')) el.remove();
+      if (tag === 'A') { el.setAttribute('target', '_blank'); el.setAttribute('rel', 'noopener noreferrer'); }
+    });
+  };
+  walk(doc.body);
+  return doc.body.innerHTML;
+}
+
+function resizeImage(file, max = 1280, q = 0.82) {
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const r = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+      const w = Math.round(img.naturalWidth * r), h = Math.round(img.naturalHeight * r);
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      res(c.toDataURL('image/jpeg', q));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('이미지를 불러올 수 없어요')); };
+    img.src = url;
+  });
+}
+
+/* =========================================================
+   Lock screen
+   ========================================================= */
+let lockMode = 'unlock'; // 'setup' | 'unlock'
+async function showLock() {
+  key = null; entries = [];
+  $('#app').classList.add('hidden');
+  $('#view').innerHTML = '';
+  closeSheet();
+  $('#lock').classList.remove('hidden');
+  const meta = await getMeta();
+  lockMode = meta ? 'unlock' : 'setup';
+  const setup = lockMode === 'setup';
+  $('#lockTitle').textContent = setup ? '일기장 만들기' : '나의 일기';
+  $('#lockSub').textContent = setup ? '일기장을 잠글 비밀번호를 정해 주세요' : '비밀번호를 입력해 주세요';
+  $('#pw1').placeholder = setup ? '새 비밀번호 (4자 이상)' : '비밀번호';
+  $('#pw1').autocomplete = setup ? 'new-password' : 'current-password';
+  $('#pw2').classList.toggle('hidden', !setup);
+  $('#lockNote').classList.toggle('hidden', !setup);
+  $('#lockBtn').textContent = setup ? '시작하기' : '열기';
+  $('#lockErr').textContent = '';
+  $('#pw1').value = ''; $('#pw2').value = '';
+  setTimeout(() => $('#pw1').focus(), 50);
+}
+$('#lockForm').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  const pw = $('#pw1').value, btn = $('#lockBtn'), err = $('#lockErr');
+  err.textContent = '';
+  if (lockMode === 'setup') {
+    if (pw.length < 4) { err.textContent = '비밀번호는 4자 이상이어야 해요'; return; }
+    if (pw !== $('#pw2').value) { err.textContent = '비밀번호가 서로 달라요'; return; }
+  } else if (!pw) { err.textContent = '비밀번호를 입력해 주세요'; return; }
+  const label = btn.textContent;
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+  try {
+    key = lockMode === 'setup' ? await setupPassword(pw) : await unlock(pw);
+    if (!key) { err.textContent = '비밀번호가 맞지 않아요'; $('#pw1').select(); return; }
+    await loadEntries();
+    $('#lock').classList.add('hidden');
+    $('#app').classList.remove('hidden');
+    $('#pw1').value = ''; $('#pw2').value = '';
+    route();
+  } catch (e) {
+    console.error(e); err.textContent = '오류가 발생했어요: ' + e.message;
+  } finally {
+    btn.disabled = false; btn.textContent = label;
+  }
+});
+$('#restoreLink').addEventListener('click', () => pickBackup());
+
+function pickBackup() {
+  const inp = $('#backupInput');
+  inp.value = '';
+  inp.onchange = async () => {
+    const f = inp.files[0]; if (!f) return;
+    const hasData = !!(await getMeta());
+    if (hasData && !confirm('현재 이 기기의 일기가 모두 백업 파일 내용으로 바뀝니다.\n계속할까요?')) return;
+    try {
+      const n = await importBackup(f);
+      alert(`${n}개의 일기를 복원했어요.\n백업할 당시의 비밀번호로 열어 주세요.`);
+      await showLock();
+    } catch (e) { alert('복원 실패: ' + e.message); }
+  };
+  inp.click();
+}
+
+/* 자동 잠금: 앱이 백그라운드에 5분 이상 있으면 잠금 */
+let hiddenAt = 0;
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) hiddenAt = Date.now();
+  else if (key && hiddenAt && Date.now() - hiddenAt > AUTO_LOCK_MS && !isDirty()) showLock();
+});
+
+/* =========================================================
+   Router
+   ========================================================= */
+let curHash = '', editorDirty = false, editorState = null;
+const isDirty = () => editorDirty;
+window.addEventListener('hashchange', () => {
+  if (editorDirty && !location.hash.startsWith('#/edit') && !location.hash.startsWith('#/write')) {
+    if (!confirm('저장하지 않은 내용이 있어요. 나갈까요?')) { history.pushState(null, '', curHash); return; }
+  }
+  route();
+});
+window.addEventListener('beforeunload', e => { if (editorDirty) { e.preventDefault(); e.returnValue = ''; } });
+const go = h => { location.hash = h; };
+
+function route() {
+  if (!key) return;
+  editorDirty = false;
+  curHash = location.hash || '#/';
+  const [, a, b] = curHash.slice(1).split('/');
+  closeSheet();
+  $('#editorToolbar').classList.add('hidden');
+  window.scrollTo(0, 0);
+  if (a === 'post' && b) showPost(decodeURIComponent(b));
+  else if (a === 'write') showEditor(null, b);
+  else if (a === 'edit' && b) showEditor(decodeURIComponent(b));
+  else showList();
+}
+
+/* =========================================================
+   List view
+   ========================================================= */
+const listState = { q: '', cat: '', day: '', cal: false, calMonth: null };
+function categories() {
+  const m = new Map();
+  entries.forEach(e => { if (e.category) m.set(e.category, (m.get(e.category) || 0) + 1); });
+  return [...m.entries()].sort((a, b) => b[1] - a[1]).map(x => x[0]);
+}
+function showList() {
+  $('#headerBar').innerHTML = `
+    <div class="brand">나의 일기</div>
+    <button class="icon-btn ${listState.cal ? 'on' : ''}" id="calBtn" aria-label="달력">${ICON.cal}</button>
+    <button class="icon-btn" id="menuBtn" aria-label="메뉴">${ICON.menu}</button>`;
+  $('#calBtn').onclick = () => { listState.cal = !listState.cal; showList(); };
+  $('#menuBtn').onclick = openMenu;
+
+  const cats = categories();
+  if (listState.cat && !cats.includes(listState.cat)) listState.cat = '';
+  const first = entries.length ? entries[entries.length - 1].date : null;
+  $('#view').innerHTML = `
+    <div class="wrap">
+      <div class="profile">
+        <h2>오늘은 어떤 하루였나요?</h2>
+        <div class="stat">총 ${entries.length}개의 일기${first ? ` · ${fmtDate(first).slice(0, -4)}부터` : ''}</div>
+      </div>
+      <div class="searchbar">${ICON.search}<input id="q" type="search" placeholder="일기 검색" value="${esc(listState.q)}"></div>
+      ${cats.length ? `<div class="chips" id="chips">
+        <button class="chip ${!listState.cat ? 'on' : ''}" data-cat="">전체</button>
+        ${cats.map(c => `<button class="chip ${listState.cat === c ? 'on' : ''}" data-cat="${esc(c)}">${esc(c)}</button>`).join('')}
+      </div>` : ''}
+      <div id="calBox"></div>
+      <div id="dayFilter"></div>
+      <div id="list"></div>
+      <div style="height:100px"></div>
+    </div>
+    <button class="fab" id="fab" aria-label="글쓰기">${ICON.plus}</button>`;
+
+  $('#q').addEventListener('input', e => { listState.q = e.target.value; renderList(); });
+  $('#chips')?.addEventListener('click', e => {
+    const c = e.target.closest('.chip'); if (!c) return;
+    listState.cat = c.dataset.cat;
+    document.querySelectorAll('#chips .chip').forEach(x => x.classList.toggle('on', x === c));
+    renderList();
+  });
+  $('#fab').onclick = () => go('#/write' + (listState.day ? '/' + listState.day : ''));
+  renderCal();
+  renderList();
+}
+function filtered() {
+  const q = listState.q.trim().toLowerCase();
+  return entries.filter(e =>
+    (!listState.cat || e.category === listState.cat) &&
+    (!listState.day || e.date === listState.day) &&
+    (!q || (e.title + ' ' + textOf(e.html) + ' ' + (e.category || '')).toLowerCase().includes(q)));
+}
+function renderList() {
+  const list = filtered();
+  const df = $('#dayFilter');
+  df.innerHTML = listState.day ? `<div class="day-filter"><span>${fmtDate(listState.day)}의 일기</span><button id="clrDay">✕</button></div>` : '';
+  if (listState.day) $('#clrDay').onclick = () => { listState.day = ''; renderCal(); renderList(); };
+
+  if (!list.length) {
+    $('#list').innerHTML = entries.length
+      ? `<div class="empty"><div class="big">🔍</div>조건에 맞는 일기가 없어요</div>`
+      : `<div class="empty"><div class="big">📔</div>아직 작성한 일기가 없어요.<br>오른쪽 아래 <b>+</b> 버튼으로 첫 일기를 써 보세요!</div>`;
+    return;
+  }
+  let html = '', lastMonth = '';
+  for (const e of list) {
+    const d = parseYmd(e.date), mk = e.date.slice(0, 7);
+    if (mk !== lastMonth) { html += `<div class="month-h">${d.getFullYear()}년 ${d.getMonth() + 1}월</div>`; lastMonth = mk; }
+    const ex = textOf(e.html).slice(0, 140), th = firstImg(e.html), wd = d.getDay();
+    html += `<button class="post-card" data-id="${esc(e.id)}">
+      <div class="pc-date"><div class="d">${d.getDate()}</div><div class="w ${wd === 0 ? 'sun' : wd === 6 ? 'sat' : ''}">${WD[wd]}${e.mood ? '<br>' + e.mood : ''}</div></div>
+      <div class="pc-body">
+        ${e.category ? `<div class="pc-cat">${esc(e.category)}</div>` : ''}
+        <div class="pc-title">${esc(e.title || '제목 없음')}</div>
+        ${ex ? `<div class="pc-ex">${esc(ex)}</div>` : ''}
+      </div>
+      ${th ? `<img class="pc-thumb" src="${th}" alt="" loading="lazy">` : ''}
+    </button>`;
+  }
+  $('#list').innerHTML = html;
+  $('#list').onclick = ev => { const c = ev.target.closest('.post-card'); if (c) go('#/post/' + encodeURIComponent(c.dataset.id)); };
+}
+function renderCal() {
+  const box = $('#calBox');
+  if (!listState.cal) { box.innerHTML = ''; return; }
+  const base = listState.calMonth || (listState.day ? parseYmd(listState.day) : new Date());
+  const y = base.getFullYear(), m = base.getMonth();
+  const has = new Set(entries.map(e => e.date));
+  const today = ymd(new Date());
+  const firstWd = new Date(y, m, 1).getDay(), days = new Date(y, m + 1, 0).getDate();
+  let cells = WD.map(w => `<div class="wd">${w}</div>`).join('');
+  for (let i = 0; i < firstWd; i++) cells += '<div></div>';
+  for (let d = 1; d <= days; d++) {
+    const k = `${y}-${pad(m + 1)}-${pad(d)}`;
+    cells += `<button class="cal-day ${has.has(k) ? 'has' : ''} ${k === today ? 'today' : ''} ${k === listState.day ? 'sel' : ''}" data-d="${k}">${d}</button>`;
+  }
+  box.innerHTML = `<div class="cal">
+    <div class="cal-h"><button class="icon-btn" id="calPrev">‹</button><b>${y}년 ${m + 1}월</b><button class="icon-btn" id="calNext">›</button></div>
+    <div class="cal-grid">${cells}</div></div>`;
+  $('#calPrev').onclick = () => { listState.calMonth = new Date(y, m - 1, 1); renderCal(); };
+  $('#calNext').onclick = () => { listState.calMonth = new Date(y, m + 1, 1); renderCal(); };
+  box.querySelector('.cal-grid').onclick = ev => {
+    const b = ev.target.closest('.cal-day'); if (!b) return;
+    const k = b.dataset.d;
+    if (listState.day === k) { listState.day = ''; }
+    else if (has.has(k)) { listState.day = k; }
+    else { listState.calMonth = new Date(y, m, 1); go('#/write/' + k); return; }
+    listState.calMonth = new Date(y, m, 1);
+    renderCal(); renderList();
+  };
+}
+
+/* =========================================================
+   Post view
+   ========================================================= */
+function showPost(id) {
+  const i = entries.findIndex(e => e.id === id);
+  const e = entries[i];
+  $('#headerBar').innerHTML = `
+    <button class="icon-btn" id="backBtn" aria-label="목록">${ICON.back}</button>
+    <div class="brand">나의 일기</div>
+    <button class="icon-btn" id="lockBtnTop" aria-label="잠그기">${ICON.lock}</button>`;
+  $('#backBtn').onclick = () => go('#/');
+  $('#lockBtnTop').onclick = () => showLock();
+  if (!e) { $('#view').innerHTML = `<div class="wrap"><div class="empty"><div class="big">🤔</div>글을 찾을 수 없어요</div></div>`; return; }
+  const newer = entries[i - 1], older = entries[i + 1];
+  $('#view').innerHTML = `
+    <div class="wrap">
+      <article class="post">
+        ${e.category ? `<div class="cat">${esc(e.category)}</div>` : ''}
+        <h1>${esc(e.title || '제목 없음')}</h1>
+        <div class="meta"><span>${fmtDate(e.date)}</span>${e.mood ? `<span class="mood">${e.mood}</span>` : ''}
+          ${e.updatedAt && e.updatedAt - e.createdAt > 60000 ? `<span>· 수정됨</span>` : ''}</div>
+        <div class="content">${sanitize(e.html)}</div>
+        <div class="post-actions">
+          <button class="btn btn-line btn-danger" id="delBtn">삭제</button>
+          <button class="btn btn-line" id="editBtn">수정</button>
+        </div>
+      </article>
+      <div class="post-nav">
+        ${older ? `<button data-id="${esc(older.id)}"><small>‹ 이전 글</small><span>${esc(older.title || '제목 없음')}</span></button>` : '<div></div>'}
+        ${newer ? `<button data-id="${esc(newer.id)}"><small>다음 글 ›</small><span>${esc(newer.title || '제목 없음')}</span></button>` : '<div></div>'}
+      </div>
+    </div>`;
+  $('#editBtn').onclick = () => go('#/edit/' + encodeURIComponent(e.id));
+  $('#delBtn').onclick = async () => {
+    if (!confirm('이 일기를 삭제할까요?\n삭제하면 되돌릴 수 없어요.')) return;
+    await deleteEntry(e.id); toast('삭제했어요'); go('#/');
+  };
+  document.querySelectorAll('.post-nav button').forEach(b => b.onclick = () => go('#/post/' + encodeURIComponent(b.dataset.id)));
+}
+
+/* =========================================================
+   Editor
+   ========================================================= */
+let savedRange = null;
+document.addEventListener('selectionchange', () => {
+  const ed = $('#edBody'); if (!ed) return;
+  const s = getSelection();
+  if (s.rangeCount && ed.contains(s.anchorNode)) savedRange = s.getRangeAt(0).cloneRange();
+});
+function restoreRange() {
+  const ed = $('#edBody'); if (!ed) return;
+  ed.focus({ preventScroll: true });
+  if (savedRange && ed.contains(savedRange.startContainer)) {
+    const s = getSelection(); s.removeAllRanges(); s.addRange(savedRange);
+  } else {
+    const r = document.createRange(); r.selectNodeContents(ed); r.collapse(false);
+    const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+  }
+}
+function exec(cmd, val = null) { restoreRange(); document.execCommand(cmd, false, val); markDirty(); updateEmpty(); }
+function markDirty() { editorDirty = true; }
+function updateEmpty() {
+  const ed = $('#edBody'); if (!ed) return;
+  ed.classList.toggle('is-empty', !ed.textContent.trim() && !ed.querySelector('img,hr,li,blockquote'));
+}
+
+function showEditor(id, presetDate) {
+  const e = id ? entries.find(x => x.id === id) : null;
+  if (id && !e) { go('#/'); return; }
+  editorState = { id: e ? e.id : null, mood: e ? e.mood || '' : '' };
+  savedRange = null;
+  const date = e ? e.date : (/^\d{4}-\d{2}-\d{2}$/.test(presetDate || '') ? presetDate : ymd(new Date()));
+
+  $('#headerBar').innerHTML = `
+    <button class="icon-btn" id="cancelBtn" aria-label="취소">${ICON.back}</button>
+    <div class="brand">${e ? '일기 수정' : '새 일기'}</div>
+    <button class="save-btn" id="saveBtn">저장</button>`;
+
+  const tb = $('#editorToolbar');
+  tb.classList.remove('hidden');
+  tb.innerHTML = `<div class="wrap" id="tbWrap">
+    <select class="tb-sel" id="blockSel" aria-label="문단 스타일">
+      <option value="p">본문</option><option value="h2">큰 제목</option><option value="h3">소제목</option>
+    </select>
+    <span class="tb-sep"></span>
+    <button class="tb" data-cmd="bold" aria-label="굵게"><b>B</b></button>
+    <button class="tb" data-cmd="italic" aria-label="기울임"><i style="font-family:serif">I</i></button>
+    <button class="tb" data-cmd="underline" aria-label="밑줄"><u>U</u></button>
+    <button class="tb" data-cmd="strikeThrough" aria-label="취소선"><s>S</s></button>
+    <button class="tb" id="colorBtn" aria-label="글자색"><span style="border-bottom:3px solid #e5484d;line-height:1.1;font-weight:700">A</span></button>
+    <span class="tb-sep"></span>
+    <button class="tb" data-cmd="justifyLeft" aria-label="왼쪽 정렬"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 10h10M4 14h16M4 18h10"/></svg></button>
+    <button class="tb" data-cmd="justifyCenter" aria-label="가운데 정렬"><svg viewBox="0 0 24 24"><path d="M4 6h16M7 10h10M4 14h16M7 18h10"/></svg></button>
+    <button class="tb" data-cmd="justifyRight" aria-label="오른쪽 정렬"><svg viewBox="0 0 24 24"><path d="M4 6h16M10 10h10M4 14h16M10 18h10"/></svg></button>
+    <span class="tb-sep"></span>
+    <button class="tb" data-cmd="insertUnorderedList" aria-label="목록"><svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/></svg></button>
+    <button class="tb" data-cmd="quote" aria-label="인용구"><svg viewBox="0 0 24 24"><path d="M7 7h4v4c0 3-2 5-4 6M14 7h4v4c0 3-2 5-4 6"/></svg></button>
+    <button class="tb" data-cmd="insertHorizontalRule" aria-label="구분선"><svg viewBox="0 0 24 24"><path d="M3 12h18"/></svg></button>
+    <button class="tb" id="imgBtn" aria-label="사진"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-8 8"/></svg></button>
+    <span class="tb-sep"></span>
+    <button class="tb" data-cmd="undo" aria-label="실행 취소"><svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 010 12h-3"/></svg></button>
+  </div>`;
+
+  $('#view').innerHTML = `
+    <div id="editorView"><div class="wrap">
+      <div class="ed-meta">
+        <input type="date" id="edDate" value="${date}" max="9999-12-31" aria-label="날짜">
+        <input class="cat-in" id="edCat" list="catList" placeholder="카테고리 (예: 일상, 여행)" value="${esc(e ? e.category || '' : '')}" maxlength="20">
+        <datalist id="catList">${categories().map(c => `<option value="${esc(c)}">`).join('')}</datalist>
+      </div>
+      <div class="moods" id="moods">${MOODS.map(m => `<button type="button" class="${editorState.mood === m ? 'on' : ''}" data-m="${m}">${m}</button>`).join('')}</div>
+      <input class="ed-title" id="edTitle" placeholder="제목" value="${esc(e ? e.title : '')}" maxlength="100">
+      <div class="ed-body" id="edBody" contenteditable="true" data-ph="오늘 있었던 일을 자유롭게 적어 보세요..."></div>
+    </div></div>`;
+
+  const ed = $('#edBody');
+  ed.innerHTML = e ? sanitize(e.html) : '';
+  try { document.execCommand('defaultParagraphSeparator', false, 'p'); } catch (_) {}
+  updateEmpty();
+
+  ed.addEventListener('input', () => { markDirty(); updateEmpty(); });
+  ['edTitle', 'edCat', 'edDate'].forEach(i => $('#' + i).addEventListener('input', markDirty));
+  $('#moods').onclick = ev => {
+    const b = ev.target.closest('button'); if (!b) return;
+    editorState.mood = editorState.mood === b.dataset.m ? '' : b.dataset.m;
+    document.querySelectorAll('#moods button').forEach(x => x.classList.toggle('on', x.dataset.m === editorState.mood));
+    markDirty();
+  };
+
+  // 붙여넣기: 이미지 파일은 축소해서 넣고, HTML은 정리해서 넣기
+  ed.addEventListener('paste', async ev => {
+    const cd = ev.clipboardData; if (!cd) return;
+    const files = [...cd.files].filter(f => f.type.startsWith('image/'));
+    if (files.length) { ev.preventDefault(); await insertImages(files); return; }
+    const html = cd.getData('text/html');
+    if (html) { ev.preventDefault(); document.execCommand('insertHTML', false, sanitize(html)); markDirty(); updateEmpty(); }
+  });
+
+  // 툴바: 버튼을 눌러도 커서가 사라지지 않도록
+  tb.addEventListener('mousedown', ev => { if (ev.target.closest('button')) ev.preventDefault(); });
+  tb.querySelectorAll('[data-cmd]').forEach(b => b.onclick = () => {
+    const c = b.dataset.cmd;
+    if (c === 'quote') {
+      const inQuote = document.queryCommandValue('formatBlock').toLowerCase() === 'blockquote';
+      exec('formatBlock', inQuote ? '<p>' : '<blockquote>');
+    } else exec(c);
+    refreshToolbar();
+  });
+  $('#blockSel').onchange = ev => { exec('formatBlock', '<' + ev.target.value + '>'); };
+  $('#colorBtn').onclick = ev => toggleColorPop(ev.currentTarget);
+  $('#imgBtn').onclick = () => {
+    const inp = $('#imgInput'); inp.value = '';
+    inp.onchange = () => insertImages([...inp.files]);
+    inp.click();
+  };
+  document.addEventListener('selectionchange', refreshToolbar);
+
+  $('#cancelBtn').onclick = () => history.length > 1 ? history.back() : go('#/');
+  $('#saveBtn').onclick = saveEditor;
+  if (!e) setTimeout(() => $('#edTitle').focus(), 50);
+}
+function refreshToolbar() {
+  const ed = $('#edBody'); if (!ed) { document.removeEventListener('selectionchange', refreshToolbar); return; }
+  const s = getSelection(); if (!s.rangeCount || !ed.contains(s.anchorNode)) return;
+  document.querySelectorAll('#tbWrap [data-cmd]').forEach(b => {
+    const c = b.dataset.cmd;
+    let on = false;
+    try {
+      if (c === 'quote') on = document.queryCommandValue('formatBlock').toLowerCase() === 'blockquote';
+      else if (!['insertHorizontalRule', 'undo'].includes(c)) on = document.queryCommandState(c);
+    } catch (_) {}
+    b.classList.toggle('on', on);
+  });
+  const blk = (document.queryCommandValue('formatBlock') || '').toLowerCase();
+  const sel = $('#blockSel'); if (sel) sel.value = ['h2', 'h3'].includes(blk) ? blk : 'p';
+}
+const COLORS = ['#1e1f23', '#6b7079', '#e5484d', '#f76b15', '#f5b400', '#03a94e', '#0d9488', '#3e7bfa', '#7c3aed', '#db2777'];
+function toggleColorPop(btn) {
+  let pop = $('#colorPop');
+  if (pop) { pop.remove(); return; }
+  pop = document.createElement('div');
+  pop.id = 'colorPop'; pop.className = 'color-pop';
+  pop.innerHTML = COLORS.map(c => `<button style="background:${c}" data-c="${c}" aria-label="${c}"></button>`).join('');
+  const tb = $('#editorToolbar');
+  const r = btn.getBoundingClientRect(), tr = tb.getBoundingClientRect();
+  pop.style.left = Math.max(8, Math.min(r.left - tr.left, tr.width - 210)) + 'px';
+  tb.appendChild(pop);
+  pop.addEventListener('mousedown', ev => ev.preventDefault());
+  pop.onclick = ev => {
+    const b = ev.target.closest('button'); if (!b) return;
+    exec('foreColor', b.dataset.c); pop.remove();
+  };
+  const off = ev => {
+    if (!document.body.contains(pop)) { document.removeEventListener('click', off); return; }
+    if (!pop.contains(ev.target) && !btn.contains(ev.target)) { pop.remove(); document.removeEventListener('click', off); }
+  };
+  setTimeout(() => document.addEventListener('click', off), 0);
+}
+async function insertImages(files) {
+  files = files.filter(f => f.type.startsWith('image/') || /\.(heic|heif)$/i.test(f.name));
+  if (!files.length) return;
+  toast(files.length > 1 ? `사진 ${files.length}장을 넣는 중...` : '사진을 넣는 중...');
+  for (const f of files) {
+    try {
+      const src = await resizeImage(f);
+      exec('insertHTML', `<p><img src="${src}" alt=""></p><p><br></p>`);
+    } catch (e) { toast(e.message); }
+  }
+}
+async function saveEditor() {
+  const ed = $('#edBody');
+  const title = $('#edTitle').value.trim();
+  const html = sanitize(ed.innerHTML);
+  const date = $('#edDate').value;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { toast('날짜를 선택해 주세요'); return; }
+  if (!title && !textOf(html) && !/<img/i.test(html)) { toast('내용을 입력해 주세요'); return; }
+  const now = Date.now();
+  const old = editorState.id ? entries.find(x => x.id === editorState.id) : null;
+  const entry = {
+    id: old ? old.id : uid(),
+    date, title, html,
+    category: $('#edCat').value.trim(),
+    mood: editorState.mood,
+    createdAt: old ? old.createdAt : now,
+    updatedAt: now,
+  };
+  const btn = $('#saveBtn'); btn.disabled = true; btn.textContent = '저장 중';
+  try {
+    await saveEntry(entry);
+    editorDirty = false;
+    toast('저장했어요');
+    // 작성 화면을 히스토리에서 대체해서 뒤로가기 시 다시 편집기로 돌아오지 않게
+    history.replaceState(null, '', '#/post/' + encodeURIComponent(entry.id));
+    route();
+  } catch (e) {
+    console.error(e);
+    alert('저장하지 못했어요: ' + e.message);
+    btn.disabled = false; btn.textContent = '저장';
+  }
+}
+
+/* =========================================================
+   Menu / settings sheet
+   ========================================================= */
+function closeSheet() { document.querySelectorAll('.overlay').forEach(o => o.remove()); }
+function openSheet(html) {
+  closeSheet();
+  const o = document.createElement('div');
+  o.className = 'overlay';
+  o.innerHTML = `<div class="sheet"><div class="grab"></div>${html}</div>`;
+  o.addEventListener('click', ev => { if (ev.target === o) o.remove(); });
+  document.body.appendChild(o);
+  return o;
+}
+async function openMenu() {
+  let usage = '';
+  try { const est = await navigator.storage.estimate(); usage = `사용 중인 저장공간 약 ${(est.usage / 1048576).toFixed(1)}MB`; } catch (_) {}
+  const o = openSheet(`
+    <h3>메뉴</h3>
+    <button class="item" data-a="lock"><span class="ic">🔒</span><div>지금 잠그기<small>다시 열려면 비밀번호가 필요해요</small></div></button>
+    <button class="item" data-a="pw"><span class="ic">🔑</span><div>비밀번호 변경</div></button>
+    <button class="item" data-a="export"><span class="ic">💾</span><div>백업 파일 저장<small>암호화된 파일로 저장돼요. 기기를 바꿀 때 사용하세요</small></div></button>
+    <button class="item" data-a="import"><span class="ic">📂</span><div>백업 파일에서 복원<small>현재 일기는 백업 내용으로 바뀌어요</small></div></button>
+    <p style="color:var(--text3);font-size:12px;margin-top:12px">${usage ? usage + ' · ' : ''}일기는 이 브라우저에 암호화되어 저장됩니다. 브라우저 데이터를 지우면 함께 지워지니 가끔 백업해 두세요.</p>`);
+  o.querySelector('.sheet').onclick = async ev => {
+    const b = ev.target.closest('.item'); if (!b) return;
+    const a = b.dataset.a;
+    if (a === 'lock') showLock();
+    else if (a === 'pw') openPwSheet();
+    else if (a === 'export') { closeSheet(); try { await exportBackup(); toast('백업 파일을 저장했어요'); } catch (e) { alert('백업 실패: ' + e.message); } }
+    else if (a === 'import') { closeSheet(); pickBackup(); }
+  };
+}
+function openPwSheet() {
+  const o = openSheet(`
+    <h3>비밀번호 변경</h3>
+    <form id="pwForm" autocomplete="off">
+      <input class="field" type="password" id="opw" placeholder="현재 비밀번호" autocomplete="current-password">
+      <input class="field" type="password" id="npw1" placeholder="새 비밀번호 (4자 이상)" autocomplete="new-password">
+      <input class="field" type="password" id="npw2" placeholder="새 비밀번호 확인" autocomplete="new-password">
+      <div class="lock-err" id="pwErr"></div>
+      <div class="row"><button type="button" class="btn btn-line" id="pwCancel">취소</button><button class="btn btn-primary" id="pwOk">변경</button></div>
+    </form>`);
+  o.querySelector('#pwCancel').onclick = closeSheet;
+  o.querySelector('#pwForm').onsubmit = async ev => {
+    ev.preventDefault();
+    const err = o.querySelector('#pwErr'), n1 = o.querySelector('#npw1').value, n2 = o.querySelector('#npw2').value;
+    if (n1.length < 4) { err.textContent = '새 비밀번호는 4자 이상이어야 해요'; return; }
+    if (n1 !== n2) { err.textContent = '새 비밀번호가 서로 달라요'; return; }
+    const btn = o.querySelector('#pwOk'); btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+    try { await changePassword(o.querySelector('#opw').value, n1); closeSheet(); toast('비밀번호를 변경했어요'); }
+    catch (e) { err.textContent = e.message; btn.disabled = false; btn.textContent = '변경'; }
+  };
+  setTimeout(() => o.querySelector('#opw').focus(), 50);
+}
+
+/* =========================================================
+   Boot
+   ========================================================= */
+(async () => {
+  if (!window.crypto || !crypto.subtle || !window.indexedDB) {
+    document.body.innerHTML = '<div class="empty" style="padding:40px 16px">이 브라우저에서는 사용할 수 없어요.<br>최신 Chrome / Safari에서 https 주소로 열어 주세요.</div>';
+    return;
+  }
+  try { db = await openDB(); }
+  catch (e) { document.body.innerHTML = '<div class="empty" style="padding:40px 16px">저장소를 열 수 없어요. (사생활 보호 모드에서는 동작하지 않을 수 있어요)</div>'; return; }
+  history.replaceState(null, '', '#/');
+  showLock();
+})();
+</script>
+</body>
+</html>
