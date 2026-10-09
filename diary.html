@@ -52,6 +52,7 @@ input,select,textarea{font:inherit;color:inherit;font-size:16px}
 .btn-line{border:1.5px solid var(--line);background:var(--card)}
 .btn-danger{color:var(--danger)}
 .lock-err{color:var(--danger);font-size:13px;min-height:20px;margin:2px 0 6px}
+.lock-link{color:var(--text2);font-size:13px;margin-top:14px;text-decoration:underline}
 .lock-note{color:var(--text3);font-size:12px;margin-top:16px;line-height:1.5}
 
 /* ---------- Header ---------- */
@@ -186,11 +187,13 @@ img.broken{min-height:60px;font-size:13px;color:var(--text3);text-align:center}
     <div class="lock-icon">🔒</div>
     <h1 id="lockTitle">나의 일기</h1>
     <p class="sub" id="lockSub">비밀번호를 입력해 주세요</p>
+    <input class="field hidden" type="email" id="email" placeholder="이메일" autocomplete="username" autocapitalize="off">
     <input class="field" type="password" id="pw1" placeholder="비밀번호" autocomplete="current-password" inputmode="text">
     <input class="field hidden" type="password" id="pw2" placeholder="비밀번호 확인" autocomplete="new-password">
     <div class="lock-err" id="lockErr"></div>
     <button class="btn btn-primary" id="lockBtn" type="submit">열기</button>
     <p class="lock-note" id="lockNote"></p>
+    <button type="button" class="lock-link hidden" id="lockAlt"></button>
   </form>
 </section>
 
@@ -217,6 +220,10 @@ img.broken{min-height:60px;font-size:13px;color:var(--text3);text-align:center}
    - Claude 링크에서 열면: 클라우드(본인 전용 공간) → 모든 기기에서 동기화
    - 그 외(GitHub Pages 등): 이 브라우저의 IndexedDB
    ========================================================= */
+/* ▼▼▼ Supabase 설정 (SUPABASE_SETUP.md 참고). 비워 두면 이 기기에만 저장 ▼▼▼ */
+const SUPABASE_URL = '';   // 예: https://abcdefgh.supabase.co
+const SUPABASE_KEY = '';   // Project API key (anon public)
+/* ▲▲▲▲▲▲ */
 const ITER = 250000;
 const AUTO_LOCK_MS = 5 * 60 * 1000;
 const te = new TextEncoder(), td = new TextDecoder();
@@ -363,19 +370,93 @@ async function localStore() {
     async usage() {
       try { const est = await navigator.storage.estimate(); return `사용 중인 저장공간 약 ${(est.usage / 1048576).toFixed(1)}MB`; } catch (_) { return ''; }
     },
-    async saveFile(filename, data) {
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(new Blob([data], { type: 'application/json' }));
-      a.download = filename;
-      document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-      return 'saved';
-    },
+    saveFile: downloadFile,
   };
+}
+
+/* ---------- 저장소: Supabase (무료 클라우드) ---------- */
+const SUPABASE_JS = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js';
+const IMG_BUCKET = 'diary-images';
+function loadScript(src) {
+  return new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = src; s.onload = res; s.onerror = () => rej(new Error('라이브러리를 불러오지 못했어요. 인터넷 연결을 확인해 주세요.'));
+    document.head.appendChild(s);
+  });
+}
+/* 로그인용 비밀번호는 일기 비밀번호에서 따로 유도해서 보냄 → 서버는 진짜 비밀번호를 모름 */
+async function loginSecret(email, pw) {
+  const base = await crypto.subtle.importKey('raw', te.encode(pw), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: te.encode('secret-diary-login:' + email.toLowerCase()), iterations: 100000, hash: 'SHA-256' }, base, 256);
+  return [...new Uint8Array(bits)].map(x => x.toString(16).padStart(2, '0')).join('');
+}
+async function supabaseStore() {
+  if (!window.supabase) await loadScript(SUPABASE_JS);
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
+  const chk = ({ data, error }) => { if (error) throw error; return data; };
+  const session = async () => (await sb.auth.getSession()).data.session;
+  const me = async () => { const s = await session(); if (!s) throw new Error('로그인이 필요해요'); return s.user.id; };
+  return {
+    kind: 'supabase',
+    hasSession: async () => !!(await session()),
+    async signIn(email, pw) {
+      const { error } = await sb.auth.signInWithPassword({ email, password: await loginSecret(email, pw) });
+      if (!error) return true;
+      if (/invalid login|invalid credentials/i.test(error.message)) return false;
+      if (/not confirmed/i.test(error.message)) throw new Error('이메일 확인이 아직 안 됐어요. 메일함의 확인 링크를 눌러 주세요.');
+      throw error;
+    },
+    async signUp(email, pw) {
+      const { data, error } = await sb.auth.signUp({ email, password: await loginSecret(email, pw) });
+      if (error) { if (/already registered|already exists/i.test(error.message)) return 'exists'; throw error; }
+      if (data.user && Array.isArray(data.user.identities) && !data.user.identities.length) return 'exists';
+      return data.session ? 'ok' : 'confirm';
+    },
+    signOut: () => sb.auth.signOut().catch(() => {}),
+    async changeLogin(pw) {
+      const s = await session();
+      chk(await sb.auth.updateUser({ password: await loginSecret(s.user.email, pw) }));
+    },
+    async getAuth() { const r = chk(await sb.from('diary_auth').select('data').maybeSingle()); return r ? r.data : null; },
+    async setAuth(a) { chk(await sb.from('diary_auth').upsert({ user_id: await me(), data: a, updated_at: new Date().toISOString() })); },
+    async listEntries() {
+      const out = [];
+      for (let from = 0; ; from += 1000) {
+        const rows = chk(await sb.from('diary_entries').select('id,data').order('id').range(from, from + 999));
+        out.push(...rows);
+        if (rows.length < 1000) break;
+      }
+      return out;
+    },
+    async putEntry(id, data) { chk(await sb.from('diary_entries').upsert({ user_id: await me(), id, data, updated_at: new Date().toISOString() })); },
+    async delEntry(id) { chk(await sb.from('diary_entries').delete().eq('id', id)); },
+    canImages: true,
+    async putImage(text) {
+      const id = uid();
+      chk(await sb.storage.from(IMG_BUCKET).upload(`${await me()}/${id}`, new Blob([unb64(text)], { type: 'application/octet-stream' }), { contentType: 'application/octet-stream' }));
+      return id;
+    },
+    async getImage(id) {
+      const blob = chk(await sb.storage.from(IMG_BUCKET).download(`${await me()}/${id}`));
+      return b64(new Uint8Array(await blob.arrayBuffer()));
+    },
+    async delImage(id) { try { await sb.storage.from(IMG_BUCKET).remove([`${await me()}/${id}`]); } catch (_) {} },
+    usage: async () => '',
+    saveFile: downloadFile,
+  };
+}
+function downloadFile(filename, data) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([data], { type: 'application/json' }));
+  a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  return 'saved';
 }
 
 /* Claude 링크 안에서 열렸는지 확인 (GitHub Pages·파일로 열면 바로 로컬 저장소) */
 async function pickStore() {
+  if (SUPABASE_URL && SUPABASE_KEY) return supabaseStore();
   const h = location.hostname;
   const plainWeb = location.protocol === 'file:' || h === 'localhost' || h === '127.0.0.1' || h.endsWith('github.io');
   if (!plainWeb) {
@@ -591,9 +672,17 @@ function resizeImage(file, max = 1280, q = 0.82) {
 
 /* =========================================================
    Lock screen
+   모드: login(로그인) · signup(가입) — Supabase 전용
+         unlock(비밀번호로 열기) · setup(처음 비밀번호 정하기)
    ========================================================= */
-let lockMode = 'unlock'; // 'setup' | 'unlock'
+let lockMode = 'unlock';
 let authCache = null;
+const LOCK_TEXT = {
+  login: ['나의 일기', '로그인해 주세요', '로그인'],
+  signup: ['일기장 만들기', '이메일과 비밀번호를 정해 주세요', '시작하기'],
+  unlock: ['나의 일기', '비밀번호를 입력해 주세요', '열기'],
+  setup: ['일기장 만들기', '일기장을 잠글 비밀번호를 정해 주세요', '시작하기'],
+};
 async function showLock() {
   leaveEditor();
   dek = null; entries = []; editorDirty = false; editorState = null;
@@ -602,41 +691,72 @@ async function showLock() {
   $('#view').innerHTML = '';
   closeSheet();
   $('#lock').classList.remove('hidden');
-  const cloud = store.kind === 'cloud';
-  $('#lockBtn').disabled = true;
-  try { authCache = await store.getAuth(); }
-  catch (e) { $('#lockErr').textContent = '불러오지 못했어요: ' + errMsg(e); return; }
-  finally { $('#lockBtn').disabled = false; }
-  lockMode = authCache ? 'unlock' : 'setup';
-  const setup = lockMode === 'setup';
-  $('#lockTitle').textContent = setup ? '일기장 만들기' : '나의 일기';
-  $('#lockSub').textContent = setup ? '일기장을 잠글 비밀번호를 정해 주세요' : '비밀번호를 입력해 주세요';
-  $('#pw1').placeholder = setup ? '새 비밀번호 (4자 이상)' : '비밀번호';
-  $('#pw1').autocomplete = setup ? 'new-password' : 'current-password';
-  $('#pw2').classList.toggle('hidden', !setup);
-  $('#lockNote').innerHTML = setup
-    ? '⚠️ 비밀번호를 잊어버리면 일기를 복구할 수 없어요.<br>' + (cloud ? '일기는 이 비밀번호로 암호화되어 클라우드에 저장되고,<br>로그인한 어느 기기에서든 볼 수 있어요.' : '일기는 이 비밀번호로 암호화되어 이 기기에만 저장돼요.')
-    : (cloud ? '☁️ 클라우드에 저장된 일기장' : '📱 이 기기에 저장된 일기장');
-  $('#lockBtn').textContent = setup ? '시작하기' : '열기';
   $('#lockErr').textContent = '';
-  $('#pw1').value = ''; $('#pw2').value = '';
-  setTimeout(() => $('#pw1').focus(), 50);
+  $('#lockBtn').disabled = true;
+  try {
+    if (store.kind === 'supabase' && !(await store.hasSession())) { authCache = null; renderLock('login'); return; }
+    authCache = await store.getAuth();
+    renderLock(authCache ? 'unlock' : 'setup');
+  } catch (e) { $('#lockErr').textContent = '불러오지 못했어요: ' + errMsg(e); }
+  finally { $('#lockBtn').disabled = false; }
 }
+function renderLock(mode) {
+  lockMode = mode;
+  const [title, sub, btn] = LOCK_TEXT[mode];
+  const needEmail = mode === 'login' || mode === 'signup';
+  const isNew = mode === 'signup' || mode === 'setup';
+  $('#lockTitle').textContent = title;
+  $('#lockSub').textContent = sub;
+  $('#email').classList.toggle('hidden', !needEmail);
+  if (needEmail && !$('#email').value) { try { $('#email').value = localStorage.getItem('diary-email') || ''; } catch (_) {} }
+  $('#pw1').placeholder = isNew ? '비밀번호 (4자 이상)' : '비밀번호';
+  $('#pw1').autocomplete = isNew ? 'new-password' : 'current-password';
+  $('#pw2').classList.toggle('hidden', !isNew);
+  $('#lockBtn').textContent = btn;
+  const where = { supabase: '클라우드에 저장되고, 어느 기기에서든 로그인하면 볼 수 있어요.', cloud: '클라우드에 저장되고, 로그인한 어느 기기에서든 볼 수 있어요.', local: '이 기기에만 저장돼요.' }[store.kind];
+  $('#lockNote').innerHTML = isNew
+    ? '⚠️ 비밀번호를 잊어버리면 일기를 복구할 수 없어요.<br>일기는 이 비밀번호로 암호화되어 ' + where
+    : (store.kind === 'local' ? '📱 이 기기에 저장된 일기장' : '☁️ 클라우드에 저장된 일기장');
+  const alt = $('#lockAlt');
+  alt.classList.toggle('hidden', store.kind !== 'supabase');
+  alt.textContent = { login: '처음이신가요? 일기장 만들기', signup: '이미 계정이 있어요 (로그인)', unlock: '다른 계정으로 로그인', setup: '로그아웃' }[mode];
+  $('#pw1').value = ''; $('#pw2').value = '';
+  setTimeout(() => (needEmail && !$('#email').value ? $('#email') : $('#pw1')).focus(), 50);
+}
+$('#lockAlt').addEventListener('click', async () => {
+  $('#lockErr').textContent = '';
+  if (lockMode === 'login') renderLock('signup');
+  else if (lockMode === 'signup') renderLock('login');
+  else { await store.signOut(); showLock(); }
+});
 $('#lockForm').addEventListener('submit', async ev => {
   ev.preventDefault();
-  const pw = $('#pw1').value, btn = $('#lockBtn'), err = $('#lockErr');
+  const pw = $('#pw1').value, email = $('#email').value.trim().toLowerCase(), btn = $('#lockBtn'), err = $('#lockErr');
+  const mode = lockMode;
   err.textContent = '';
-  if (lockMode === 'setup') {
+  if ((mode === 'login' || mode === 'signup') && !/^\S+@\S+\.\S+$/.test(email)) { err.textContent = '이메일을 확인해 주세요'; return; }
+  if (mode === 'setup' || mode === 'signup') {
     if (pw.length < 4) { err.textContent = '비밀번호는 4자 이상이어야 해요'; return; }
     if (pw !== $('#pw2').value) { err.textContent = '비밀번호가 서로 달라요'; return; }
   } else if (!pw) { err.textContent = '비밀번호를 입력해 주세요'; return; }
   const label = btn.textContent;
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
   try {
+    if (mode === 'login' || mode === 'signup') {
+      try { localStorage.setItem('diary-email', email); } catch (_) {}
+      if (mode === 'login') {
+        if (!(await store.signIn(email, pw))) { err.textContent = '이메일 또는 비밀번호가 맞지 않아요'; return; }
+      } else {
+        const r = await store.signUp(email, pw);
+        if (r === 'exists') { err.textContent = '이미 가입된 이메일이에요. 로그인해 주세요'; return; }
+        if (r === 'confirm') { renderLock('login'); $('#email').value = email; notify('메일함에서 확인 링크를 누른 뒤 로그인해 주세요.'); return; }
+      }
+      authCache = await store.getAuth();
+    }
     let raw;
-    if (lockMode === 'setup') {
-      // 다른 기기에서 먼저 만들었는지 한 번 더 확인
-      if (await store.getAuth()) { await showLock(); err.textContent = '다른 기기에서 이미 일기장을 만들었어요. 그 비밀번호로 열어 주세요.'; return; }
+    if (!authCache) {
+      // 처음: 무작위 데이터 키를 만들고 비밀번호로 감싸서 저장
+      if (mode === 'setup' && await store.getAuth()) { await showLock(); err.textContent = '다른 기기에서 이미 일기장을 만들었어요. 그 비밀번호로 열어 주세요.'; return; }
       raw = crypto.getRandomValues(new Uint8Array(32));
       await store.setAuth(await makeAuth(pw, raw));
     } else {
@@ -662,7 +782,7 @@ document.addEventListener('visibilitychange', async () => {
   if (document.hidden) { hiddenAt = Date.now(); return; }
   if (!dek || editorDirty) return;
   if (hiddenAt && Date.now() - hiddenAt > AUTO_LOCK_MS) { showLock(); return; }
-  if (store.kind === 'cloud' && !curHash.startsWith('#/edit') && !curHash.startsWith('#/write')) {
+  if (store.kind !== 'local' && !curHash.startsWith('#/edit') && !curHash.startsWith('#/write')) {
     try { await loadEntries(); if (dek && !editorState) rerender(); } catch (_) {}
   }
 });
@@ -733,7 +853,7 @@ function showList() {
     <div class="wrap">
       <div class="profile">
         <h2>오늘은 어떤 하루였나요?</h2>
-        <div class="stat">총 ${entries.length}개의 일기${first ? ` · ${fmtDate(first).slice(0, -4)}부터` : ''} · ${store.kind === 'cloud' ? '☁️ 모든 기기에서 동기화' : '📱 이 기기에 저장'}</div>
+        <div class="stat">총 ${entries.length}개의 일기${first ? ` · ${fmtDate(first).slice(0, -4)}부터` : ''} · ${store.kind !== 'local' ? '☁️ 모든 기기에서 동기화' : '📱 이 기기에 저장'}</div>
       </div>
       <div class="searchbar">${ICON.search}<input id="q" type="search" placeholder="일기 검색" value="${esc(listState.q)}"></div>
       ${cats.length ? `<div class="chips" id="chips">
@@ -1103,21 +1223,23 @@ function openSheet(html) {
   return o;
 }
 async function openMenu() {
-  const cloud = store.kind === 'cloud';
+  const cloud = store.kind !== 'local';
   const o = openSheet(`
     <h3>메뉴</h3>
     <button class="item" data-a="lock"><span class="ic">🔒</span><div>지금 잠그기<small>다시 열려면 비밀번호가 필요해요</small></div></button>
+    ${store.kind === 'supabase' ? '<button class="item" data-a="logout"><span class="ic">🚪</span><div>로그아웃<small>이 기기에서 로그아웃해요</small></div></button>' : ''}
     <button class="item" data-a="pw"><span class="ic">🔑</span><div>비밀번호 변경${cloud ? '<small>모든 기기에 함께 적용돼요</small>' : ''}</div></button>
     <button class="item" data-a="export"><span class="ic">💾</span><div>백업 파일 저장<small>암호화된 파일로 저장돼요</small></div></button>
     <button class="item" data-a="import"><span class="ic">📂</span><div>백업 파일 가져오기<small>백업의 일기를 지금 일기장에 합쳐요</small></div></button>
     <p style="color:var(--text3);font-size:12px;margin-top:12px" id="usageNote">${cloud
-      ? '☁️ 일기는 암호화되어 클라우드의 본인 전용 공간에 저장돼요. 이 링크로 로그인한 어느 기기에서든 같은 일기를 볼 수 있어요.'
+      ? '☁️ 일기는 암호화되어 클라우드의 본인 전용 공간에 저장돼요. 어느 기기에서든 로그인하면 같은 일기를 볼 수 있어요.'
       : '📱 일기는 이 브라우저에 암호화되어 저장돼요. 브라우저 데이터를 지우면 함께 지워지니 가끔 백업해 두세요.'}</p>`);
   store.usage().then(u => { const n = o.querySelector('#usageNote'); if (u && n) n.textContent += ' ' + u; });
   o.querySelector('.sheet').onclick = async ev => {
     const b = ev.target.closest('.item'); if (!b) return;
     const a = b.dataset.a;
     if (a === 'lock') showLock();
+    else if (a === 'logout') { await store.signOut(); showLock(); }
     else if (a === 'pw') openPwSheet();
     else if (a === 'export') {
       closeSheet(); toast('백업 파일을 만드는 중...', 10000);
@@ -1160,9 +1282,15 @@ function openPwSheet() {
     if (n1 !== n2) { err.textContent = '새 비밀번호가 서로 달라요'; return; }
     const btn = o.querySelector('#pwOk'); btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
     try {
-      const raw = await openAuth(o.querySelector('#opw').value, await store.getAuth());
+      const opw = o.querySelector('#opw').value;
+      const raw = await openAuth(opw, await store.getAuth());
       if (!raw) throw new Error('현재 비밀번호가 맞지 않아요');
-      await store.setAuth(await makeAuth(n1, raw));
+      const auth = await makeAuth(n1, raw);
+      if (store.kind === 'supabase') {
+        await store.changeLogin(n1);
+        try { await store.setAuth(auth); }
+        catch (e) { await store.changeLogin(opw).catch(() => {}); throw e; } // 로그인 비밀번호 되돌리기
+      } else await store.setAuth(auth);
       closeSheet(); toast('비밀번호를 변경했어요');
     } catch (e) { err.textContent = errMsg(e); btn.disabled = false; btn.textContent = '변경'; }
   };
