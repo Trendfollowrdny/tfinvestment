@@ -59,6 +59,10 @@ input,select,textarea{font:inherit;color:inherit;font-size:16px}
 header.top{position:sticky;top:0;z-index:20;background:var(--card);background:color-mix(in srgb,var(--card) 92%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line);padding-top:var(--safe-t)}
 header.top .wrap{display:flex;align-items:center;gap:8px;height:56px}
 .brand{font-size:19px;font-weight:800;letter-spacing:-.3px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.brand-btn{text-align:left;cursor:pointer}
+.out-btn{flex:none;display:inline-flex;align-items:center;gap:4px;height:36px;padding:0 10px;border-radius:10px;border:1.5px solid var(--line);font-size:13px;font-weight:600;color:var(--text2)}
+.out-btn svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.out-btn:active{background:var(--accent-soft)}
 .brand small{font-weight:500;color:var(--text3);font-size:13px;margin-left:6px}
 .icon-btn{width:40px;height:40px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;font-size:19px;flex:none}
 .icon-btn:active,.icon-btn.on{background:var(--accent-soft)}
@@ -573,6 +577,8 @@ const ICON = {
   back: '<svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>',
   plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
   search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
+  home: '<svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>',
+  logout: '<svg viewBox="0 0 24 24"><path d="M15 4h3a2 2 0 012 2v12a2 2 0 01-2 2h-3"/><path d="M10 17l-5-5 5-5M5 12h11"/></svg>',
   lock: '<svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>',
 };
 
@@ -606,7 +612,7 @@ function askPassword(msg) {
     o.querySelector('#apNo').onclick = () => { o.remove(); res(null); };
     o.addEventListener('click', ev => { if (ev.target === o) res(null); });
     o.querySelector('#apForm').onsubmit = ev => { ev.preventDefault(); const v = o.querySelector('#apPw').value; o.remove(); res(v); };
-    setTimeout(() => o.querySelector('#apPw').focus(), 50);
+    setTimeout(() => o.querySelector('#apPw')?.focus(), 50);
   });
 }
 function textOf(html) {
@@ -838,11 +844,36 @@ function categories() {
   entries.forEach(e => { if (e.category) m.set(e.category, (m.get(e.category) || 0) + 1); });
   return [...m.entries()].sort((a, b) => b[1] - a[1]).map(x => x[0]);
 }
+/* 위쪽 바 공통 버튼: 홈(첫 화면), 로그아웃(클라우드) 또는 잠그기(이 기기 저장) */
+function goHome() {
+  Object.assign(listState, { q: '', cat: '', day: '', calMonth: null });
+  if ((location.hash || '#/') === '#/') { route(); } else go('#/');
+}
+const homeBtnHtml = () => `<button class="icon-btn" id="homeBtn" aria-label="첫 화면">${ICON.home}</button>`;
+const exitBtnHtml = () => store.kind === 'supabase'
+  ? `<button class="out-btn" id="logoutBtn" aria-label="로그아웃">${ICON.logout}<span>로그아웃</span></button>`
+  : `<button class="icon-btn" id="lockBtnTop" aria-label="잠그기">${ICON.lock}</button>`;
+async function logout() {
+  if (editorDirty && !(await ask('저장하지 않은 내용이 있어요. 로그아웃할까요?', { ok: '로그아웃', danger: true }))) return;
+  if (!editorDirty && !(await ask('로그아웃할까요?\n다음에 열 때 이메일과 비밀번호를 다시 입력해야 해요.', { ok: '로그아웃' }))) return;
+  editorDirty = false;
+  await store.signOut();
+  history.replaceState(null, '', '#/');
+  showLock();
+}
+function wireHeader() {
+  $('#homeBtn') && ($('#homeBtn').onclick = goHome);
+  $('.brand-btn') && ($('.brand-btn').onclick = goHome);
+  $('#logoutBtn') && ($('#logoutBtn').onclick = logout);
+  $('#lockBtnTop') && ($('#lockBtnTop').onclick = () => showLock());
+}
 function showList() {
   $('#headerBar').innerHTML = `
-    <div class="brand">나의 일기</div>
+    <button class="brand brand-btn">나의 일기</button>
     <button class="icon-btn ${listState.cal ? 'on' : ''}" id="calBtn" aria-label="달력">${ICON.cal}</button>
+    ${exitBtnHtml()}
     <button class="icon-btn" id="menuBtn" aria-label="메뉴">${ICON.menu}</button>`;
+  wireHeader();
   $('#calBtn').onclick = () => { listState.cal = !listState.cal; showList(); };
   $('#menuBtn').onclick = openMenu;
 
@@ -954,10 +985,11 @@ function showPost(id) {
   const e = entries[i];
   $('#headerBar').innerHTML = `
     <button class="icon-btn" id="backBtn" aria-label="목록">${ICON.back}</button>
-    <div class="brand">나의 일기</div>
-    <button class="icon-btn" id="lockBtnTop" aria-label="잠그기">${ICON.lock}</button>`;
+    <button class="brand brand-btn">나의 일기</button>
+    ${homeBtnHtml()}
+    ${exitBtnHtml()}`;
   $('#backBtn').onclick = () => go('#/');
-  $('#lockBtnTop').onclick = () => showLock();
+  wireHeader();
   if (!e) { $('#view').innerHTML = `<div class="wrap"><div class="empty"><div class="big">🤔</div>글을 찾을 수 없어요</div></div>`; return; }
   const newer = entries[i - 1], older = entries[i + 1];
   $('#view').innerHTML = `
@@ -1024,7 +1056,9 @@ function showEditor(id, presetDate) {
   $('#headerBar').innerHTML = `
     <button class="icon-btn" id="cancelBtn" aria-label="취소">${ICON.back}</button>
     <div class="brand">${e ? '일기 수정' : '새 일기'}</div>
+    ${homeBtnHtml()}
     <button class="save-btn" id="saveBtn">저장</button>`;
+  wireHeader();
 
   const tb = $('#editorToolbar');
   tb.classList.remove('hidden');
@@ -1109,7 +1143,7 @@ function showEditor(id, presetDate) {
 
   $('#cancelBtn').onclick = () => history.length > 1 ? history.back() : go('#/');
   $('#saveBtn').onclick = saveEditor;
-  if (!e) setTimeout(() => $('#edTitle').focus(), 50);
+  if (!e) setTimeout(() => $('#edTitle')?.focus(), 50);
 }
 function refreshToolbar() {
   const ed = $('#edBody'); if (!ed) { document.removeEventListener('selectionchange', refreshToolbar); return; }
@@ -1294,7 +1328,7 @@ function openPwSheet() {
       closeSheet(); toast('비밀번호를 변경했어요');
     } catch (e) { err.textContent = errMsg(e); btn.disabled = false; btn.textContent = '변경'; }
   };
-  setTimeout(() => o.querySelector('#opw').focus(), 50);
+  setTimeout(() => o.querySelector('#opw')?.focus(), 50);
 }
 
 /* =========================================================
