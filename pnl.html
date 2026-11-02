@@ -52,6 +52,46 @@ h1{font-size:30px;font-weight:600;letter-spacing:-.2px;border-bottom:1px solid v
 .hbtn.y{background:transparent;color:var(--yl);border:1px solid var(--yl)}
 .hbtn.y:hover{background:rgba(252,213,53,.12)}
 
+/* ---------- investor tabs ---------- */
+#invBar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:20px}
+#invBar .ilab{color:var(--tx3);font-size:11px;letter-spacing:1.4px;font-weight:600;margin-right:6px}
+.itab{background:var(--card);color:var(--tx2);font-size:13.5px;font-weight:600;letter-spacing:.6px;
+  padding:9px 18px;border-radius:8px;border:1px solid var(--bd);display:flex;align-items:center;gap:9px}
+.itab:hover{color:var(--tx)}
+.itab.on{background:var(--card2);color:var(--yl);border-color:var(--yl)}
+.itab .amt{font-size:11px;font-weight:500;color:var(--tx3)}
+.itab.on .amt{color:var(--yl);opacity:.75}
+
+/* ---------- contributions ---------- */
+.crow{display:grid;grid-template-columns:1.1fr 1.3fr 1fr 1fr auto;gap:10px 12px;align-items:end;
+  background:var(--card2);border:1px solid #262b33;border-radius:10px;padding:13px 15px;margin-bottom:9px}
+.crow .del{background:var(--card);color:var(--tx3);font-size:16px;line-height:1;padding:9px 12px;border-radius:7px}
+.crow .del:hover{background:var(--rd);color:#fff}
+.cderive{color:var(--tx3);font-size:11.5px;padding-bottom:11px;text-align:right;white-space:nowrap}
+
+/* ---------- KRW block ---------- */
+#krwPanel .kgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:26px}
+#krwPanel .kc{border-top:2px solid var(--bd);padding-top:16px;padding-right:16px}
+#krwPanel .kc .lab{color:var(--tx2);font-size:12px;margin-bottom:11px}
+#krwPanel .kc .big{font-size:25px;font-weight:600;letter-spacing:-.4px}
+#krwPanel .kc .sub{font-size:12px;color:var(--tx3);margin-top:7px}
+.fxbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--card2);
+  border:1px solid #262b33;border-radius:10px;padding:13px 16px;margin-bottom:24px}
+.fxbar .t{color:var(--tx2);font-size:12.5px}
+.fxbar .ibox{width:150px}
+.fxbar .note{color:var(--tx3);font-size:11.5px;margin-left:auto}
+
+/* ---------- roster ---------- */
+table.rt{width:100%;border-collapse:collapse}
+table.rt th{color:var(--tx2);font-size:11.5px;font-weight:400;text-align:right;padding:10px 10px;border-bottom:1px solid var(--bd)}
+table.rt th:first-child,table.rt td:first-child{text-align:left}
+table.rt td{font-size:13px;padding:13px 10px;border-bottom:1px solid #20252c;text-align:right}
+table.rt tr.tot td{font-weight:600;border-top:1px solid var(--bd);border-bottom:none}
+table.rt td.nm{font-weight:600;letter-spacing:.5px}
+table.rt tr.clk:hover td{background:rgba(252,213,53,.05);cursor:pointer}
+.flowtag{display:inline-block;font-size:10px;color:var(--yl);background:rgba(252,213,53,.1);
+  border:1px solid rgba(252,213,53,.3);padding:1px 6px;border-radius:4px;margin-left:6px}
+
 .mtabs{display:flex;gap:32px;margin-bottom:16px}
 .mtab{color:var(--tx2);font-size:15px;font-weight:500;padding-bottom:9px;background:none}
 .mtab.on{color:var(--tx);border-bottom:3px solid var(--yl)}
@@ -155,6 +195,9 @@ table.pt tr.tot td{font-weight:600;border-top:1px solid var(--bd);border-bottom:
   h1{font-size:22px}
   #headBtns{margin-left:0;width:100%}
   #sumCard{grid-template-columns:1fr 1fr;gap:22px 10px}
+  #krwPanel .kgrid{grid-template-columns:1fr 1fr;gap:22px 10px}
+  .crow{grid-template-columns:1fr 1fr;gap:10px}
+  .cderive{text-align:left;padding-bottom:0}
   .kv2{grid-template-columns:1fr;gap:0}
   .two,#assetRow{grid-template-columns:1fr;gap:26px}
   #nav .nl{display:none}
@@ -201,6 +244,17 @@ table.pt tr.tot td{font-weight:600;border-top:1px solid var(--bd);border-bottom:
       </div>
     </div>
 
+    <!-- ============ INVESTOR TABS ============ -->
+    <div id="invBar"></div>
+
+    <!-- ============ SECTION 0 : ROSTER (ALL view) ============ -->
+    <div class="panel" id="rosterPanel" style="display:none">
+      <h2 class="sec">Investor Roster</h2>
+      <div class="subt" style="margin-top:-16px">Each investor is managed as a separate book — own capital, own FX on each contribution, own P&amp;L. Click a row to open that investor.</div>
+      <div class="tblScroll"><table class="rt" id="rtable"></table></div>
+      <div class="foot" id="rosterFoot"></div>
+    </div>
+
     <!-- ============ SECTION 1 : INPUT ============ -->
     <div class="panel" id="inputPanel">
       <h2>① Input Panel — Periods</h2>
@@ -213,6 +267,47 @@ table.pt tr.tot td{font-weight:600;border-top:1px solid var(--bd);border-bottom:
         <button class="btnG" id="resetBtn">Reset All</button>
       </div>
       <div class="warn" id="warn"></div>
+    </div>
+
+    <!-- ============ SECTION 1b : CAPITAL & FX ============ -->
+    <div class="panel" id="capPanel">
+      <h2>② Input Panel — Capital &amp; FX</h2>
+      <div class="subt">One row per KRW→USDT conversion. The rate you actually got on that date, not a market average. A contribution dated inside a period is treated as capital added during that period, not as profit.</div>
+      <div id="contribList"></div>
+      <div class="acts">
+        <button class="btnG" id="addCBtn">+ Add Contribution</button>
+      </div>
+    </div>
+
+    <!-- ============ SECTION 1c : KRW TRANSLATION ============ -->
+    <div class="panel" id="krwPanel">
+      <h2 class="sec" style="margin-bottom:6px">KRW Translation</h2>
+      <div class="subt">Since-inception only. KRW P&amp;L is the month-end valuation of the USDT book against what was actually paid in won — there is no monthly KRW figure.</div>
+      <div class="fxbar">
+        <span class="t">Month-end USDT/KRW</span>
+        <div class="ibox"><input type="number" step="any" id="endFx" placeholder="1347"><span class="suf">KRW</span></div>
+        <span class="t" id="fxAsOf"></span>
+        <span class="note">Upbit USDT/KRW close</span>
+      </div>
+      <div class="kgrid">
+        <div class="kc"><div class="lab">투자원금 (KRW)</div><div class="big" id="kPrin">-</div><div class="sub" id="kPrinSub">-</div></div>
+        <div class="kc"><div class="lab">가중평균 환율</div><div class="big" id="kWavg">-</div><div class="sub" id="kWavgSub">-</div></div>
+        <div class="kc"><div class="lab">월말 평가액 (KRW)</div><div class="big" id="kVal">-</div><div class="sub" id="kValSub">-</div></div>
+        <div class="kc"><div class="lab">원화 평가손익</div><div class="big" id="kPnl">-</div><div class="sub" id="kPnlSub">-</div></div>
+      </div>
+      <div class="kv2">
+        <div>
+          <div class="kv"><span class="k">USD 누적손익</span><span class="v" id="kUsdPnl">-</span></div>
+          <div class="kv"><span class="k">USD 누적수익률</span><span class="v" id="kUsdRet">-</span></div>
+          <div class="kv"><span class="k">USD 투자원금 합계</span><span class="v" id="kUsdPrin">-</span></div>
+        </div>
+        <div>
+          <div class="kv"><span class="k">원화 누적수익률</span><span class="v" id="kKrwRet">-</span></div>
+          <div class="kv"><span class="k">환율효과</span><span class="v" id="kFxEff">-</span></div>
+          <div class="kv"><span class="k">월말 USDT 잔고</span><span class="v" id="kEndBal">-</span></div>
+        </div>
+      </div>
+      <div class="foot" id="krwFoot"></div>
     </div>
 
     <!-- ============ SECTION 2 : RESULT ============ -->
@@ -338,7 +433,8 @@ table.pt tr.tot td{font-weight:600;border-top:1px solid var(--bd);border-bottom:
 <script>
 'use strict';
 const $=id=>document.getElementById(id);
-const LS='tfPnlReportV2';
+const LS='tfPnlReportV3';
+const NAMES=['KWON','CHOI','RYU','KIM'];
 const C={tx:'#EAECEF',tx2:'#848E9C',grid:'#2B3139',yl:'#FCD535',gr:'#2EBD85',rd:'#F6465D',bl:'#4A90D9'};
 
 const pad=n=>String(n).padStart(2,'0');
@@ -353,19 +449,81 @@ function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a
 function uid(){return 'p'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);}
 
 /* ================= state ================= */
-let cfg=loadCfg(), trades=[], daily=[], stats={}, pstats=[];
+let book=loadBook(), cfg=null, trades=[], daily=[], stats={}, pstats=[];
 function newPeriod(from,to,start,end){
   return {id:uid(),from:from,to:to,start:start,end:end,profit:0,loss:0,trades:0,win:0,vol:null,seed:Math.floor(Math.random()*1e6)};
 }
-function loadCfg(){
-  try{const s=JSON.parse(localStorage.getItem(LS));if(s&&s.periods&&s.periods.length)return s;}catch(e){}
-  const p1=newPeriod('2026-07-09','2026-07-31',669971,720218);
-  p1.profit=62800;p1.loss=12553;p1.trades=4;p1.win=75;p1.seed=7;
-  const p2=newPeriod('2026-08-01','2026-08-31',720218,820218);
-  p2.profit=140000;p2.loss=40000;p2.trades=10;p2.win=60;p2.seed=42;
-  return {periods:[p1,p2],scope:'all',winDays:0,hide:false};
+function newContrib(date,krw,fx){return {id:uid(),date:date,krw:krw,fx:fx};}
+function mkPeriod(from,to,start,end,profit,loss,trades,win,seed){
+  const p=newPeriod(from,to,start,end);
+  p.profit=profit;p.loss=loss;p.trades=trades;p.win=win;p.seed=seed;return p;
 }
-function saveCfg(){localStorage.setItem(LS,JSON.stringify(cfg));}
+
+function seedBook(){
+  const inv={};
+  // ---- KWON : original book, topped up 2026-10-13 ----
+  inv.KWON={
+    contribs:[newContrib('2026-07-09',50000000,1492.60), newContrib('2026-10-13',25000000,1358.00)],
+    periods:[
+      mkPeriod('2026-07-09','2026-07-31',33498.59,36010.94,3140.00,627.65,4,75,7),
+      mkPeriod('2026-08-01','2026-08-31',36010.94,39900.12,3889.18,0,2,100,42),
+      mkPeriod('2026-09-01','2026-10-31',39900.12,61758.40,3448.85,0,3,100,91)
+    ],
+    endFx:1347, scope:'all', winDays:0, hide:true};
+  // ---- CHOI ----
+  inv.CHOI={
+    contribs:[newContrib('2026-09-10',50000000,1362.00)],
+    periods:[mkPeriod('2026-09-10','2026-10-31',36710.72,42400.88,5690.16,0,3,100,23)],
+    endFx:1347, scope:'all', winDays:0, hide:true};
+  // ---- RYU ----
+  inv.RYU={
+    contribs:[newContrib('2026-07-25',20000000,1465.85), newContrib('2026-08-23',5000000,1372.00)],
+    periods:[mkPeriod('2026-07-25','2026-10-31',13643.96,20469.32,3181.04,0,5,100,55)],
+    endFx:1347, scope:'all', winDays:0, hide:true};
+  // ---- KIM ----
+  inv.KIM={
+    contribs:[newContrib('2026-10-07',1000000,1362.00)],
+    periods:[mkPeriod('2026-10-07','2026-10-31',734.21,773.13,38.91,0,1,100,12)],
+    endFx:1347, scope:'all', winDays:0, hide:true};
+  return {active:'KWON', inv:inv};
+}
+function loadBook(){
+  try{const s=JSON.parse(localStorage.getItem(LS));if(s&&s.inv&&s.inv.KWON)return s;}catch(e){}
+  return seedBook();
+}
+function saveCfg(){localStorage.setItem(LS,JSON.stringify(book));}
+function isAll(){return book.active==='ALL';}
+function useInv(n){book.active=n;cfg=isAll()?null:book.inv[n];saveCfg();}
+
+/* ---- capital helpers (shared by KRW block and roster) ---- */
+function sortedContribs(c){return (c.contribs||[]).slice().sort((a,b)=>dt(a.date)-dt(b.date));}
+function capital(c){
+  const cs=sortedContribs(c);
+  let krw=0,usd=0;
+  cs.forEach(x=>{const f=+x.fx||0,k=+x.krw||0;krw+=k;if(f>0)usd+=k/f;});
+  return {cs:cs, krw:krw, usd:usd, wavg:usd>0?krw/usd:0, seedUsd:cs.length&&+cs[0].fx>0?(+cs[0].krw)/(+cs[0].fx):0};
+}
+/* USD added after the initial seed, inside [a,b] */
+function flowIn(c,a,b){
+  const cs=sortedContribs(c);
+  let f=0;
+  cs.forEach((x,i)=>{if(i===0)return;const r=+x.fx||0;if(r>0&&x.date>=a&&x.date<=b)f+=(+x.krw)/r;});
+  return f;
+}
+function bookStats(c){
+  const cap=capital(c);
+  const ps=(c.periods||[]).slice().sort((a,b)=>dt(a.from)-dt(b.from));
+  const pnl=ps.reduce((a,p)=>a+(p.profit-p.loss),0);
+  const endUsd=ps.length?ps[ps.length-1].end:cap.usd;
+  const fx=+c.endFx||0;
+  const endKrw=endUsd*fx;
+  return {cap:cap, ps:ps, pnl:pnl, endUsd:endUsd, fx:fx, endKrw:endKrw,
+    usdRet:cap.usd>0?pnl/cap.usd*100:0,
+    krwPnl:endKrw-cap.krw,
+    krwRet:cap.krw>0?(endKrw/cap.krw-1)*100:0,
+    fxEff:cap.wavg>0&&fx>0?(fx/cap.wavg-1)*100:0,
+    from:ps.length?ps[0].from:'-', to:ps.length?ps[ps.length-1].to:'-'};
+}
 function sortedPeriods(){return cfg.periods.slice().sort((a,b)=>dt(a.from)-dt(b.from));}
 function scopeList(){
   const ps=sortedPeriods();
@@ -376,11 +534,13 @@ function scopeList(){
 function renderPeriods(){
   const ps=sortedPeriods();
   $('periodList').innerHTML=ps.map((p,i)=>{
-    const net=p.profit-p.loss, ret=p.start>0?(p.end-p.start)/p.start*100:0;
+    const net=p.profit-p.loss, fl=flowIn(cfg,p.from,p.to);
+    const base=p.start+fl, ret=base>0?net/base*100:0;
     return '<div class="prow" data-id="'+p.id+'">'+
       '<div class="phead">'+
         '<span class="pno">'+(i+1)+'</span>'+
         '<span class="ptitle">'+p.from+' ~ '+p.to+'</span>'+
+        (fl>0?'<span class="flowtag">+ '+num(fl)+' USD added</span>':'')+
         '<span class="pstat">Net <b style="color:'+col(net)+'">'+sgn(net)+num(net)+' USD</b> · Return <b style="color:'+col(ret)+'">'+sgn(ret)+num(ret)+'%</b></span>'+
         '<span class="sp">'+
           '<button class="btnS" onclick="autoEnd(\''+p.id+'\')">Auto End</button>'+
@@ -402,7 +562,8 @@ function renderPeriods(){
       '</div></div>';
   }).join('');
   $('inputPanel').style.display=cfg.hide?'none':'block';
-  $('toggleBtn').textContent=cfg.hide?'✎ Show Input Panel':'✎ Hide Input Panel';
+  $('capPanel').style.display=cfg.hide?'none':'block';
+  $('toggleBtn').textContent=cfg.hide?'✎ Show Input Panels':'✎ Hide Input Panels';
 }
 function fld(p,key,label,type,suf){
   const v=p[key]==null?'':p[key];
@@ -424,9 +585,10 @@ function collect(){
       p[k]=v;
     }
   });
+  collectContribs();
   saveCfg();
 }
-function autoEnd(id){collect();const p=cfg.periods.find(x=>x.id===id);p.end=+(p.start+p.profit-p.loss).toFixed(2);saveCfg();build();}
+function autoEnd(id){collect();const p=cfg.periods.find(x=>x.id===id);p.end=+(p.start+flowIn(cfg,p.from,p.to)+p.profit-p.loss).toFixed(2);saveCfg();build();}
 function shuffle(id){collect();const p=cfg.periods.find(x=>x.id===id);p.seed=Math.floor(Math.random()*1e6);saveCfg();build();}
 function dupe(id){
   collect();
@@ -476,9 +638,9 @@ function build(){
   // per-period stats (always all periods, for the breakdown table)
   pstats=ps.map(p=>{
     const g=genTrades(p);
-    const net=p.profit-p.loss;
-    return {p:p,trades:g.trades,W:g.W,L:g.L,net:net,
-      ret:p.start>0?(p.end-p.start)/p.start*100:0,
+    const net=p.profit-p.loss, fl=flowIn(cfg,p.from,p.to), base=p.start+fl;
+    return {p:p,trades:g.trades,W:g.W,L:g.L,net:net,flow:fl,
+      ret:base>0?net/base*100:0,
       avgP:g.W>0?p.profit/g.W:0, avgL:g.L>0?p.loss/g.L:0,
       vol:p.vol!=null?p.vol:(p.profit+p.loss)*12};
   });
@@ -491,8 +653,13 @@ function build(){
   const allDays=dateList(from,to);
   const map={};trades.forEach(t=>{map[t.t]=(map[t.t]||0)+t.v;});
   const startBal=inScope[0].start;
-  let cum=0;
-  daily=allDays.map(d=>{cum+=(map[d]||0);return {d:d,v:+(map[d]||0).toFixed(2),cum:cum,eq:startBal+cum};});
+  const fmap={};
+  sortedContribs(cfg).forEach((x,i)=>{
+    if(i===0)return;const r=+x.fx||0;if(r>0&&x.date>=from&&x.date<=to)fmap[x.date]=(fmap[x.date]||0)+(+x.krw)/r;
+  });
+  let cum=0,cflow=0;
+  daily=allDays.map(d=>{cum+=(map[d]||0);cflow+=(fmap[d]||0);
+    return {d:d,v:+(map[d]||0).toFixed(2),f:+(fmap[d]||0).toFixed(2),cum:cum,flow:cflow,eq:startBal+cflow+cum};});
 
   // window
   let wFrom=from, wTo=to;
@@ -509,9 +676,11 @@ function build(){
   const net=profit-loss, nTr=wins+losses;
   const wd=dw.filter(x=>x.v>0).length, ld=dw.filter(x=>x.v<0).length;
   const before=daily.filter(x=>x.d<wFrom).reduce((a,b)=>a+b.v,0);
-  const startEq=startBal+before;
+  const beforeF=daily.filter(x=>x.d<wFrom).reduce((a,b)=>a+b.f,0);
+  const startEq=startBal+beforeF+before;
+  const flowW=dw.reduce((a,b)=>a+b.f,0);
   const fullWin=(wFrom===from&&wTo===to);
-  const endEq=fullWin?inScope[inScope.length-1].end:startEq+net;
+  const endEq=fullWin?inScope[inScope.length-1].end:startEq+flowW+net;
   const volW=fullWin?pstats.filter(s=>ids[s.p.id]).reduce((a,s)=>a+s.vol,0)
     :pstats.filter(s=>ids[s.p.id]).reduce((a,s)=>a+s.vol,0)*(nTr/Math.max(1,trades.length));
   const sumLast=n=>daily.slice(-n).reduce((a,b)=>a+b.v,0);
@@ -520,8 +689,8 @@ function build(){
     wins:wins,losses:losses,nTr:nTr,wd:wd,ld:ld,bd:dw.length-wd-ld,
     winRate:nTr?wins/nTr*100:0,
     avgP:wins?profit/wins:0, avgL:losses?loss/losses:0,
-    vol:volW, startEq:startEq, endEq:endEq,
-    ret:startEq>0?(endEq-startEq)/startEq*100:0,
+    vol:volW, startEq:startEq, endEq:endEq, flow:flowW,
+    ret:(startEq+flowW)>0?net/(startEq+flowW)*100:0,
     d1:sumLast(1),d7:sumLast(7),d30:sumLast(30),
     lifetime:cfg.periods.reduce((a,p)=>a+(p.profit-p.loss),0)};
   render();
@@ -530,7 +699,10 @@ function build(){
 /* ================= render ================= */
 function render(){
   renderPeriods();
-  const st=stats, bse=st.startEq||1;
+  renderContribs();
+  renderKrw();
+  renderInvBar();
+  const st=stats, bse=(st.startEq+(st.flow||0))||1;
   const set=(idp,ida,amt)=>{
     $(idp).textContent=sgn(amt)+num(amt/bse*100)+'%';$(idp).style.color=col(amt);
     $(ida).textContent=sgn(amt)+usd(amt);$(ida).style.color=col(amt);
@@ -563,14 +735,16 @@ function render(){
   $('vBal').textContent=num(st.startEq)+' → '+num(st.endEq);
 
   // period table
-  let rows='<tr><th>#</th><th>Period</th><th>Start</th><th>End</th><th>Profit</th><th>Loss</th><th>Net</th><th>Return</th><th>Trades</th><th>Win Rate</th></tr>';
-  let tp=0,tl=0,tt=0,tw=0;
+  let rows='<tr><th>#</th><th>Period</th><th>Start</th><th>Added</th><th>End</th><th>Profit</th><th>Loss</th><th>Net</th><th>Return</th><th>Trades</th><th>Win Rate</th></tr>';
+  let tp=0,tl=0,tt=0,tw=0,tf=0;
   pstats.forEach((s,i)=>{
     const p=s.p, sel=(cfg.scope==='all'||cfg.scope===p.id);
-    if(sel){tp+=p.profit;tl+=p.loss;tt+=p.trades;tw+=s.W;}
+    if(sel){tp+=p.profit;tl+=p.loss;tt+=p.trades;tw+=s.W;tf+=s.flow;}
     rows+='<tr class="'+(cfg.scope===p.id?'sel':'')+'"><td>'+(i+1)+'</td>'+
       '<td>'+p.from+' ~ '+p.to+(cfg.scope===p.id?'<span class="pill">viewing</span>':'')+'</td>'+
-      '<td>'+num(p.start)+'</td><td>'+num(p.end)+'</td>'+
+      '<td>'+num(p.start)+'</td>'+
+      '<td style="color:'+(s.flow>0?C.yl:C.tx2)+'">'+(s.flow>0?'+'+num(s.flow):'—')+'</td>'+
+      '<td>'+num(p.end)+'</td>'+
       '<td style="color:'+C.gr+'">+'+num(p.profit)+'</td>'+
       '<td style="color:'+C.rd+'">-'+num(p.loss)+'</td>'+
       '<td style="color:'+col(s.net)+'">'+sgn(s.net)+num(s.net)+'</td>'+
@@ -578,9 +752,11 @@ function render(){
       '<td>'+p.trades+'</td><td>'+num(p.win,1)+'%</td></tr>';
   });
   const tn=tp-tl, first=scopeList()[0], last=scopeList()[scopeList().length-1];
-  const tRet=first.start>0?(last.end-first.start)/first.start*100:0;
+  const tRet=(first.start+tf)>0?tn/(first.start+tf)*100:0;
   rows+='<tr class="tot"><td></td><td>TOTAL'+(cfg.scope==='all'?'':' (selected)')+'</td>'+
-    '<td>'+num(first.start)+'</td><td>'+num(last.end)+'</td>'+
+    '<td>'+num(first.start)+'</td>'+
+    '<td style="color:'+(tf>0?C.yl:C.tx2)+'">'+(tf>0?'+'+num(tf):'—')+'</td>'+
+    '<td>'+num(last.end)+'</td>'+
     '<td style="color:'+C.gr+'">+'+num(tp)+'</td>'+
     '<td style="color:'+C.rd+'">-'+num(tl)+'</td>'+
     '<td style="color:'+col(tn)+'">'+sgn(tn)+num(tn)+'</td>'+
@@ -589,7 +765,7 @@ function render(){
   $('ptable').innerHTML=rows;
 
   // mismatch warning
-  const bad=cfg.periods.filter(p=>Math.abs((p.end-p.start)-(p.profit-p.loss))>0.5);
+  const bad=cfg.periods.filter(p=>Math.abs((p.end-p.start-flowIn(cfg,p.from,p.to))-(p.profit-p.loss))>0.5);
   $('warn').textContent=bad.length?('Note: '+bad.length+' period(s) have End Seed − Start Seed different from Profit − Loss. Press "Auto End" on those rows to sync.'):'';
 
   drawAll();
@@ -684,13 +860,137 @@ function drawAll(){
   drawDaily();
   let c=0;const cumW=dd.map(p=>{c+=p.v;return c;});
   drawLine('cCum',cumW,C.yl,v=>num(v,0));
-  const bse=stats.startEq||1;
-  const pct=cumW.map(v=>v/bse*100);
+  let fb=stats.startEq||1;
+  const pct=cumW.map((v,i)=>{fb+=(dd[i].f||0);return v/(fb||1)*100;});
   const rnd=mulberry32(dd.length*13+7);
   let m=0;const mark=dd.map(()=>{m+=(rnd()-0.5)*1.4;return m;});
   drawLine('cPct',pct,C.yl,v=>num(v,0)+'%',mark);
-  drawLine('cAsset',cumW.map(v=>stats.startEq+v),C.yl,v=>num(v,0));
+  let af=0;
+  drawLine('cAsset',cumW.map((v,i)=>{af+=(dd[i].f||0);return stats.startEq+af+v;}),C.yl,v=>num(v,0));
   drawDonut();
+}
+
+/* ================= investors ================= */
+function renderInvBar(){
+  let h='<span class="ilab">INVESTOR</span>';
+  h+='<button class="itab '+(isAll()?'on':'')+'" data-i="ALL">ALL</button>';
+  NAMES.forEach(n=>{
+    const c=book.inv[n];if(!c)return;
+    const b=bookStats(c);
+    h+='<button class="itab '+(book.active===n?'on':'')+'" data-i="'+n+'">'+n+
+       '<span class="amt">'+num(c.contribs.reduce((a,x)=>a+(+x.krw||0),0)/1e6,0)+'M</span></button>';
+  });
+  $('invBar').innerHTML=h;
+  document.querySelectorAll('.itab').forEach(b=>b.onclick=()=>{
+    if(!isAll())collect();
+    useInv(b.dataset.i);boot();
+  });
+}
+
+/* ================= contributions ================= */
+function renderContribs(){
+  const cs=sortedContribs(cfg);
+  $('contribList').innerHTML=cs.map((x,i)=>{
+    const f=+x.fx||0, u=f>0?(+x.krw)/f:0;
+    return '<div class="crow" data-cid="'+x.id+'">'+
+      '<div class="fld"><label>'+(i===0?'Initial Conversion':'Additional Conversion')+'</label>'+
+        '<div class="ibox"><input type="date" data-cid="'+x.id+'" data-ck="date" value="'+x.date+'"></div></div>'+
+      '<div class="fld"><label>Amount</label>'+
+        '<div class="ibox"><input type="number" step="any" data-cid="'+x.id+'" data-ck="krw" value="'+x.krw+'"><span class="suf">KRW</span></div></div>'+
+      '<div class="fld"><label>USDT/KRW Rate</label>'+
+        '<div class="ibox"><input type="number" step="any" data-cid="'+x.id+'" data-ck="fx" value="'+x.fx+'"><span class="suf">KRW</span></div></div>'+
+      '<div class="cderive">= '+num(u)+' USDT</div>'+
+      '<button class="del" onclick="delContrib(\''+x.id+'\')" title="Delete">×</button>'+
+    '</div>';
+  }).join('');
+}
+function collectContribs(){
+  document.querySelectorAll('#contribList input').forEach(el=>{
+    const x=cfg.contribs.find(c=>c.id===el.dataset.cid);if(!x)return;
+    const k=el.dataset.ck;
+    if(k==='date'){if(el.value)x.date=el.value;}
+    else{let v=parseFloat(el.value);if(isNaN(v))v=0;x[k]=v;}
+  });
+  const fx=parseFloat($('endFx').value);
+  if(!isNaN(fx)&&fx>0)cfg.endFx=fx;
+}
+function delContrib(id){
+  if(cfg.contribs.length<=1){alert('At least one conversion is required.');return;}
+  if(!confirm('Delete this conversion?'))return;
+  collect();
+  cfg.contribs=cfg.contribs.filter(c=>c.id!==id);
+  saveCfg();build();
+}
+
+/* ================= KRW translation ================= */
+function renderKrw(){
+  const b=bookStats(cfg);
+  $('endFx').value=cfg.endFx||'';
+  $('fxAsOf').textContent='as of '+b.to;
+  const set=(id,txt,c)=>{const e=$(id);e.textContent=txt;if(c)e.style.color=c;};
+  set('kPrin','₩'+num(b.cap.krw,0));
+  $('kPrinSub').textContent=b.cap.cs.length+' conversion'+(b.cap.cs.length>1?'s':'')+' · '+b.cap.cs[0].date+(b.cap.cs.length>1?' ~ '+b.cap.cs[b.cap.cs.length-1].date:'');
+  set('kWavg',num(b.cap.wavg));
+  $('kWavgSub').textContent='$'+num(b.cap.usd)+' 환산';
+  set('kVal','₩'+num(b.endKrw,0));
+  $('kValSub').textContent='$'+num(b.endUsd)+' × '+num(b.fx);
+  set('kPnl',sgn(b.krwPnl)+'₩'+num(Math.abs(b.krwPnl),0),col(b.krwPnl));
+  $('kPnlSub').textContent=sgn(b.krwRet)+num(b.krwRet)+'% (원화 기준)';
+  set('kUsdPnl',sgn(b.pnl)+usd(b.pnl),col(b.pnl));
+  set('kUsdRet',sgn(b.usdRet)+num(b.usdRet)+' %',col(b.usdRet));
+  set('kUsdPrin',usd(b.cap.usd));
+  set('kKrwRet',sgn(b.krwRet)+num(b.krwRet)+' %',col(b.krwRet));
+  set('kFxEff',sgn(b.fxEff)+num(b.fxEff)+' %',col(b.fxEff));
+  set('kEndBal',usd(b.endUsd));
+  $('krwFoot').textContent='원화 손익 = 월말 USDT 잔고 × '+num(b.fx)+'원 − 실제 납입한 '+num(b.cap.krw,0)+'원. '+
+    '수익률은 늘어난 투자원금 전액 대비 단순 수익률이며, 납입 시점을 가중하지 않습니다. 환전하지 않은 평가손익입니다.';
+}
+
+/* ================= roster (ALL view) ================= */
+function renderRoster(){
+  let rows='<tr><th>Investor</th><th>Since</th><th>원금 (KRW)</th><th>평균환율</th><th>원금 (USD)</th>'+
+    '<th>USD 손익</th><th>USD 수익률</th><th>월말 평가 (KRW)</th><th>원화 손익</th><th>원화 수익률</th><th>환율효과</th></tr>';
+  let tk=0,tu=0,tp=0,tv=0;
+  NAMES.forEach(n=>{
+    const c=book.inv[n];if(!c)return;
+    const b=bookStats(c);
+    tk+=b.cap.krw;tu+=b.cap.usd;tp+=b.pnl;tv+=b.endKrw;
+    rows+='<tr class="clk" data-go="'+n+'">'+
+      '<td class="nm">'+n+'</td>'+
+      '<td>'+b.cap.cs[0].date+(b.cap.cs.length>1?'<span class="pill">+'+(b.cap.cs.length-1)+'</span>':'')+'</td>'+
+      '<td>'+num(b.cap.krw,0)+'</td><td>'+num(b.cap.wavg)+'</td><td>'+num(b.cap.usd)+'</td>'+
+      '<td style="color:'+col(b.pnl)+'">'+sgn(b.pnl)+num(b.pnl)+'</td>'+
+      '<td style="color:'+col(b.usdRet)+'">'+sgn(b.usdRet)+num(b.usdRet)+'%</td>'+
+      '<td>'+num(b.endKrw,0)+'</td>'+
+      '<td style="color:'+col(b.krwPnl)+'">'+sgn(b.krwPnl)+num(b.krwPnl,0)+'</td>'+
+      '<td style="color:'+col(b.krwRet)+'">'+sgn(b.krwRet)+num(b.krwRet)+'%</td>'+
+      '<td style="color:'+col(b.fxEff)+'">'+sgn(b.fxEff)+num(b.fxEff)+'%</td></tr>';
+  });
+  const tpr=tu>0?tp/tu*100:0, tkp=tv-tk, tkr=tk>0?(tv/tk-1)*100:0;
+  const twa=tu>0?tk/tu:0, tfx=twa>0?( (tv/(tu+tp)) /twa-1)*100:0;
+  rows+='<tr class="tot"><td>TOTAL</td><td>'+NAMES.length+' investors</td>'+
+    '<td>'+num(tk,0)+'</td><td>'+num(twa)+'</td><td>'+num(tu)+'</td>'+
+    '<td style="color:'+col(tp)+'">'+sgn(tp)+num(tp)+'</td>'+
+    '<td style="color:'+col(tpr)+'">'+sgn(tpr)+num(tpr)+'%</td>'+
+    '<td>'+num(tv,0)+'</td>'+
+    '<td style="color:'+col(tkp)+'">'+sgn(tkp)+num(tkp,0)+'</td>'+
+    '<td style="color:'+col(tkr)+'">'+sgn(tkr)+num(tkr)+'%</td>'+
+    '<td style="color:'+col(tfx)+'">'+sgn(tfx)+num(tfx)+'%</td></tr>';
+  $('rtable').innerHTML=rows;
+  document.querySelectorAll('tr.clk').forEach(r=>r.onclick=()=>{useInv(r.dataset.go);boot();});
+  $('rosterFoot').textContent='각 투자자는 납입 시점과 환율이 달라 같은 전략이라도 원화 수익률이 갈립니다. '+
+    'USD 수익률은 동일 전략의 성과, 원화 수익률은 거기에 각자의 환전 환율이 얹힌 결과입니다. 월말 환율은 투자자 탭에서 개별 설정합니다.';
+}
+
+/* ================= boot / view switch ================= */
+function boot(){
+  renderInvBar();
+  const all=isAll();
+  $('rosterPanel').style.display=all?'block':'none';
+  ['inputPanel','capPanel','krwPanel','result'].forEach(id=>$(id).style.display=all?'none':'');
+  $('headBtns').style.display=all?'none':'flex';
+  if(all){renderRoster();return;}
+  renderContribs();build();
 }
 
 /* ================= events ================= */
@@ -708,15 +1008,22 @@ $('chainBtn').onclick=()=>{
   const ps=sortedPeriods();
   ps.forEach((p,i)=>{
     if(i>0)p.start=ps[i-1].end;
-    p.end=+(p.start+p.profit-p.loss).toFixed(2);
+    p.end=+(p.start+flowIn(cfg,p.from,p.to)+p.profit-p.loss).toFixed(2);
   });
   saveCfg();build();
 };
 $('toggleBtn').onclick=()=>{collect();cfg.hide=!cfg.hide;saveCfg();renderPeriods();};
 $('resetBtn').onclick=()=>{
-  if(!confirm('Reset all periods and inputs?'))return;
-  localStorage.removeItem(LS);cfg=loadCfg();renderPeriods();build();
+  if(!confirm('Reset ALL investors back to the seeded data?'))return;
+  localStorage.removeItem(LS);book=loadBook();useInv(book.active);boot();
 };
+$('addCBtn').onclick=()=>{
+  collect();
+  const cs=sortedContribs(cfg), last=cs[cs.length-1];
+  cfg.contribs.push(newContrib(ymd(new Date(dt(last.date)+864e5*30)),0,last.fx));
+  saveCfg();build();
+};
+$('endFx').addEventListener('change',()=>{collect();build();});
 document.querySelectorAll('.rb').forEach(b=>b.onclick=()=>{
   cfg.winDays=+b.dataset.d;saveCfg();build();
 });
@@ -742,7 +1049,10 @@ $('shareClose').onclick=()=>$('shareBg').style.display='none';
 $('shareBg').onclick=e=>{if(e.target.id==='shareBg')$('shareBg').style.display='none';};
 let rt;window.addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(drawAll,150);});
 
-renderPeriods();build();
+const qp=new URLSearchParams(location.search).get('inv');
+if(qp&&(qp==='ALL'||book.inv[qp.toUpperCase()]))book.active=qp.toUpperCase();
+useInv(book.active);
+boot();
 </script>
 </body>
 </html>
