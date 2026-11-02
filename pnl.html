@@ -516,8 +516,29 @@ function seedBook(){
     endFx:1347, scope:'all', winDays:0, hide:true};
   return {active:'KWON', allocInv:'KWON', allocShare:5, inv:inv};
 }
+/* Books saved before a seed changed are kept as-is; only what is missing
+   is filled in, so edits made on this browser survive an update. */
+function migrate(s,seed){
+  let touched=false;
+  Object.keys(seed.inv).forEach(k=>{
+    if(!s.inv[k]){s.inv[k]=seed.inv[k];touched=true;return;}
+    const c=s.inv[k], sc=seed.inv[k];
+    if(c.endFx==null){c.endFx=sc.endFx;touched=true;}
+    if(!c.contribs||!c.contribs.length){c.contribs=sc.contribs;touched=true;}
+    (sc.periods||[]).forEach(sp=>{
+      const p=(c.periods||[]).find(x=>x.id===sp.id);
+      if(p&&sp.tfrom&&p.tfrom===undefined){p.tfrom=sp.tfrom;touched=true;}
+    });
+  });
+  if(s.allocShare==null){s.allocShare=seed.allocShare;s.allocInv=seed.allocInv;touched=true;}
+  if(touched)localStorage.setItem(LS,JSON.stringify(s));
+  return s;
+}
 function loadBook(){
-  try{const s=JSON.parse(localStorage.getItem(LS));if(s&&s.inv&&s.inv.KWON)return s;}catch(e){}
+  try{
+    const s=JSON.parse(localStorage.getItem(LS));
+    if(s&&s.inv&&s.inv.KWON)return migrate(s,seedBook());
+  }catch(e){}
   return seedBook();
 }
 function saveCfg(){localStorage.setItem(LS,JSON.stringify(book));}
