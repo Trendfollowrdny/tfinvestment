@@ -52,6 +52,11 @@ h1{font-size:30px;font-weight:600;letter-spacing:-.2px;border-bottom:1px solid v
 .hbtn.y{background:transparent;color:var(--yl);border:1px solid var(--yl)}
 .hbtn.y:hover{background:rgba(252,213,53,.12)}
 
+body.bare #nav,body.bare #side,body.bare .prev,body.bare #head,body.bare #invBar,
+body.bare #inputPanel,body.bare #capPanel,body.bare .mtabs{display:none!important}
+body.bare #wrap{grid-template-columns:1fr}
+body.bare #content{padding:0;max-width:none}
+
 /* ---------- investor tabs ---------- */
 #invBar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:20px}
 #invBar .ilab{color:var(--tx3);font-size:11px;letter-spacing:1.4px;font-weight:600;margin-right:6px}
@@ -435,7 +440,7 @@ table.pt tr.tot td{font-weight:600;border-top:1px solid var(--bd);border-bottom:
 const $=id=>document.getElementById(id);
 const LS='tfPnlReportV3';
 const NAMES=['KWON','CHOI','RYU','KIM'];
-const C={tx:'#EAECEF',tx2:'#848E9C',grid:'#2B3139',yl:'#FCD535',gr:'#2EBD85',rd:'#F6465D',bl:'#4A90D9'};
+const C={tx:'#EAECEF',tx2b:'#848E9C',tx2:'#848E9C',grid:'#2B3139',yl:'#FCD535',gr:'#2EBD85',rd:'#F6465D',bl:'#4A90D9'};
 
 const pad=n=>String(n).padStart(2,'0');
 const ymd=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
@@ -454,9 +459,9 @@ function newPeriod(from,to,start,end){
   return {id:uid(),from:from,to:to,start:start,end:end,profit:0,loss:0,trades:0,win:0,vol:null,seed:Math.floor(Math.random()*1e6)};
 }
 function newContrib(date,krw,fx){return {id:uid(),date:date,krw:krw,fx:fx};}
-function mkPeriod(from,to,start,end,profit,loss,trades,win,seed){
+function mkPeriod(id,from,to,start,end,profit,loss,trades,win,seed){
   const p=newPeriod(from,to,start,end);
-  p.profit=profit;p.loss=loss;p.trades=trades;p.win=win;p.seed=seed;return p;
+  p.id=id;p.profit=profit;p.loss=loss;p.trades=trades;p.win=win;p.seed=seed;return p;
 }
 
 function seedBook(){
@@ -465,25 +470,25 @@ function seedBook(){
   inv.KWON={
     contribs:[newContrib('2026-07-09',50000000,1492.60), newContrib('2026-10-13',25000000,1358.00)],
     periods:[
-      mkPeriod('2026-07-09','2026-07-31',33498.59,36010.94,3140.00,627.65,4,75,7),
-      mkPeriod('2026-08-01','2026-08-31',36010.94,39900.12,3889.18,0,2,100,42),
-      mkPeriod('2026-09-01','2026-10-31',39900.12,61758.40,3448.85,0,3,100,91)
+      mkPeriod('kwon-1','2026-07-09','2026-07-31',33498.59,36010.94,3140.00,627.65,4,75,7),
+      mkPeriod('kwon-2','2026-08-01','2026-08-31',36010.94,39900.12,3889.18,0,2,100,42),
+      mkPeriod('kwon-3','2026-09-01','2026-10-31',39900.12,61758.40,3448.85,0,3,100,91)
     ],
     endFx:1347, scope:'all', winDays:0, hide:true};
   // ---- CHOI ----
   inv.CHOI={
     contribs:[newContrib('2026-09-10',50000000,1362.00)],
-    periods:[mkPeriod('2026-09-10','2026-10-31',36710.72,42400.88,5690.16,0,3,100,23)],
+    periods:[mkPeriod('choi-1','2026-09-10','2026-10-31',36710.72,42400.88,5690.16,0,3,100,23)],
     endFx:1347, scope:'all', winDays:0, hide:true};
   // ---- RYU ----
   inv.RYU={
     contribs:[newContrib('2026-07-25',20000000,1465.85), newContrib('2026-08-23',5000000,1372.00)],
-    periods:[mkPeriod('2026-07-25','2026-10-31',13643.96,20469.32,3181.04,0,5,100,55)],
+    periods:[mkPeriod('ryu-1','2026-07-25','2026-10-31',13643.96,20469.32,3181.04,0,5,100,55)],
     endFx:1347, scope:'all', winDays:0, hide:true};
   // ---- KIM ----
   inv.KIM={
     contribs:[newContrib('2026-10-07',1000000,1362.00)],
-    periods:[mkPeriod('2026-10-07','2026-10-31',734.21,773.13,38.91,0,1,100,12)],
+    periods:[mkPeriod('kim-1','2026-10-07','2026-10-31',734.21,773.13,38.91,0,1,100,12)],
     endFx:1347, scope:'all', winDays:0, hide:true};
   return {active:'KWON', inv:inv};
 }
@@ -745,8 +750,8 @@ function render(){
       '<td>'+num(p.start)+'</td>'+
       '<td style="color:'+(s.flow>0?C.yl:C.tx2)+'">'+(s.flow>0?'+'+num(s.flow):'—')+'</td>'+
       '<td>'+num(p.end)+'</td>'+
-      '<td style="color:'+C.gr+'">+'+num(p.profit)+'</td>'+
-      '<td style="color:'+C.rd+'">-'+num(p.loss)+'</td>'+
+      '<td style="color:'+(p.profit>0?C.gr:C.tx2)+'">'+(p.profit>0?'+'+num(p.profit):'—')+'</td>'+
+      '<td style="color:'+(p.loss>0?C.rd:C.tx2)+'">'+(p.loss>0?'-'+num(p.loss):'—')+'</td>'+
       '<td style="color:'+col(s.net)+'">'+sgn(s.net)+num(s.net)+'</td>'+
       '<td style="color:'+col(s.ret)+'">'+sgn(s.ret)+num(s.ret)+'%</td>'+
       '<td>'+p.trades+'</td><td>'+num(p.win,1)+'%</td></tr>';
@@ -757,8 +762,8 @@ function render(){
     '<td>'+num(first.start)+'</td>'+
     '<td style="color:'+(tf>0?C.yl:C.tx2)+'">'+(tf>0?'+'+num(tf):'—')+'</td>'+
     '<td>'+num(last.end)+'</td>'+
-    '<td style="color:'+C.gr+'">+'+num(tp)+'</td>'+
-    '<td style="color:'+C.rd+'">-'+num(tl)+'</td>'+
+    '<td style="color:'+(tp>0?C.gr:C.tx2)+'">'+(tp>0?'+'+num(tp):'—')+'</td>'+
+    '<td style="color:'+(tl>0?C.rd:C.tx2)+'">'+(tl>0?'-'+num(tl):'—')+'</td>'+
     '<td style="color:'+col(tn)+'">'+sgn(tn)+num(tn)+'</td>'+
     '<td style="color:'+col(tRet)+'">'+sgn(tRet)+num(tRet)+'%</td>'+
     '<td>'+tt+'</td><td>'+num(tt?tw/tt*100:0,1)+'%</td></tr>';
@@ -1052,6 +1057,9 @@ let rt;window.addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(draw
 const qp=new URLSearchParams(location.search).get('inv');
 if(qp&&(qp==='ALL'||book.inv[qp.toUpperCase()]))book.active=qp.toUpperCase();
 useInv(book.active);
+const qs=new URLSearchParams(location.search).get('scope');
+if(qs&&cfg&&(qs==='all'||cfg.periods.some(p=>p.id===qs)))cfg.scope=qs;
+if(new URLSearchParams(location.search).get('bare')==='1')document.body.classList.add('bare');
 boot();
 </script>
 </body>
