@@ -466,6 +466,15 @@ function mkPeriod(id,from,to,start,end,profit,loss,trades,win,seed){
 
 function seedBook(){
   const inv={};
+  // ---- FUND : whole book (investors hold pro-rata slices of this) ----
+  inv.FUND={
+    contribs:[newContrib('2026-07-09',1000000000,1492.60), newContrib('2026-10-13',500000000,1358.00)],
+    periods:[
+      mkPeriod('fund-1','2026-07-09','2026-07-31',669971.86,720218.86,62800.00,12553.00,4,75,7),
+      mkPeriod('fund-2','2026-08-01','2026-08-31',720218.86,798002.50,77783.64,0,2,100,42),
+      mkPeriod('fund-3','2026-09-01','2026-10-31',798002.50,1235167.97,68976.96,0,3,100,91)
+    ],
+    endFx:1347, scope:'all', winDays:0, hide:true};
   // ---- KWON : original book, topped up 2026-10-13 ----
   inv.KWON={
     contribs:[newContrib('2026-07-09',50000000,1492.60), newContrib('2026-10-13',25000000,1358.00)],
@@ -878,6 +887,7 @@ function drawAll(){
 /* ================= investors ================= */
 function renderInvBar(){
   let h='<span class="ilab">INVESTOR</span>';
+  h+='<button class="itab '+(book.active==='FUND'?'on':'')+'" data-i="FUND">FUND<span class="amt">1,500M</span></button>';
   h+='<button class="itab '+(isAll()?'on':'')+'" data-i="ALL">ALL</button>';
   NAMES.forEach(n=>{
     const c=book.inv[n];if(!c)return;
