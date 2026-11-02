@@ -53,7 +53,7 @@ h1{font-size:30px;font-weight:600;letter-spacing:-.2px;border-bottom:1px solid v
 .hbtn.y:hover{background:rgba(252,213,53,.12)}
 
 body.bare #nav,body.bare #side,body.bare .prev,body.bare #head,body.bare #invBar,
-body.bare #inputPanel,body.bare #capPanel,body.bare .mtabs{display:none!important}
+body.bare #inputPanel,body.bare #capPanel,body.bare #allocPanel,body.bare .mtabs{display:none!important}
 body.bare #wrap{grid-template-columns:1fr}
 body.bare #content{padding:0;max-width:none}
 
@@ -315,6 +315,21 @@ table.pt tr.tot td{font-weight:600;border-top:1px solid var(--bd);border-bottom:
       <div class="foot" id="krwFoot"></div>
     </div>
 
+    <!-- ============ SECTION 1d : ALLOCATION (FUND only) ============ -->
+    <div class="panel" id="allocPanel" style="display:none">
+      <h2 class="sec" style="margin-bottom:6px">Investor Allocation</h2>
+      <div class="subt">펀드 전체와 투자자 지분을 나란히 본 화면입니다. 서한의 PORTFOLIO DETAIL과 같은 배치이며, 그대로 옮겨 적으시면 됩니다.</div>
+      <div class="fxbar">
+        <span class="t">투자자</span>
+        <span id="allocChips" style="display:flex;gap:7px;flex-wrap:wrap"></span>
+        <span class="t" style="margin-left:10px">지분율</span>
+        <div class="ibox" style="width:110px"><input type="number" step="any" id="allocShare"><span class="suf">%</span></div>
+        <button class="btnS" id="allocCopy" style="margin-left:auto">⧉ Copy as text</button>
+      </div>
+      <div class="tblScroll"><table class="rt" id="atable"></table></div>
+      <div class="foot" id="allocFoot"></div>
+    </div>
+
     <!-- ============ SECTION 2 : RESULT ============ -->
     <div id="result">
       <div class="mtabs">
@@ -472,7 +487,7 @@ function seedBook(){
     periods:[
       mkPeriod('fund-1','2026-07-09','2026-07-31',669971.86,720218.86,62800.00,12553.00,4,75,7),
       mkPeriod('fund-2','2026-08-01','2026-08-31',720218.86,798002.50,77783.64,0,2,100,42),
-      mkPeriod('fund-3','2026-09-01','2026-10-31',798002.50,1235167.97,68976.96,0,3,100,91)
+      Object.assign(mkPeriod('fund-3','2026-09-01','2026-10-31',798002.50,1235167.97,68976.96,0,3,100,91),{tfrom:'2026-10-01'})
     ],
     endFx:1347, scope:'all', winDays:0, hide:true};
   // ---- KWON : original book, topped up 2026-10-13 ----
@@ -481,7 +496,7 @@ function seedBook(){
     periods:[
       mkPeriod('kwon-1','2026-07-09','2026-07-31',33498.59,36010.94,3140.00,627.65,4,75,7),
       mkPeriod('kwon-2','2026-08-01','2026-08-31',36010.94,39900.12,3889.18,0,2,100,42),
-      mkPeriod('kwon-3','2026-09-01','2026-10-31',39900.12,61758.40,3448.85,0,3,100,91)
+      Object.assign(mkPeriod('kwon-3','2026-09-01','2026-10-31',39900.12,61758.40,3448.85,0,3,100,91),{tfrom:'2026-10-01'})
     ],
     endFx:1347, scope:'all', winDays:0, hide:true};
   // ---- CHOI ----
@@ -499,7 +514,7 @@ function seedBook(){
     contribs:[newContrib('2026-10-07',1000000,1362.00)],
     periods:[mkPeriod('kim-1','2026-10-07','2026-10-31',734.21,773.13,38.91,0,1,100,12)],
     endFx:1347, scope:'all', winDays:0, hide:true};
-  return {active:'KWON', inv:inv};
+  return {active:'KWON', allocInv:'KWON', allocShare:5, inv:inv};
 }
 function loadBook(){
   try{const s=JSON.parse(localStorage.getItem(LS));if(s&&s.inv&&s.inv.KWON)return s;}catch(e){}
@@ -573,6 +588,7 @@ function renderPeriods(){
         fld(p,'trades','Total Trades','number','trades')+
         fld(p,'win','Win Rate','number','%')+
         fld(p,'vol','Volume (opt.)','number','USD')+
+        fld(p,'tfrom','Trades From (opt.)','date','')+
       '</div></div>';
   }).join('');
   $('inputPanel').style.display=cfg.hide?'none':'block';
@@ -590,6 +606,7 @@ function collect(){
     const p=cfg.periods.find(x=>x.id===el.dataset.id);if(!p)return;
     const k=el.dataset.k;
     if(k==='from'||k==='to'){ if(el.value)p[k]=el.value; }
+    else if(k==='tfrom'){ p.tfrom=el.value||null; }
     else if(k==='vol'){ const v=parseFloat(el.value);p.vol=isNaN(v)?null:v; }
     else{
       let v=parseFloat(el.value);if(isNaN(v))v=0;
@@ -637,7 +654,7 @@ function split(total,n,rnd){
   return w.map(x=>total*x/s);
 }
 function genTrades(p){
-  const days=dateList(p.from,p.to);
+  const days=dateList((p.tfrom&&p.tfrom>=p.from&&p.tfrom<=p.to)?p.tfrom:p.from,p.to);
   const rnd=mulberry32(p.seed*7919+days.length);
   const W=Math.round(p.trades*p.win/100), L=Math.max(0,p.trades-W);
   const out=[];
@@ -716,6 +733,9 @@ function render(){
   renderContribs();
   renderKrw();
   renderInvBar();
+  const isFund=(book.active==='FUND');
+  $('allocPanel').style.display=isFund?'block':'none';
+  if(isFund)renderAlloc();
   const st=stats, bse=(st.startEq+(st.flow||0))||1;
   const set=(idp,ida,amt)=>{
     $(idp).textContent=sgn(amt)+num(amt/bse*100)+'%';$(idp).style.color=col(amt);
@@ -961,6 +981,66 @@ function renderKrw(){
     '수익률은 늘어난 투자원금 전액 대비 단순 수익률이며, 납입 시점을 가중하지 않습니다. 환전하지 않은 평가손익입니다.';
 }
 
+/* ================= allocation (FUND view) ================= */
+function allocRows(){
+  const b=bookStats(cfg);                       // FUND book
+  const sh=(book.allocShare==null?5:+book.allocShare)/100;
+  const inScope=scopeList();
+  const perNet=stats.net||0;                    // 당기 (현재 선택된 기간)
+  const pLab=(cfg.scope==='all')?'전체':(md(inScope[0].from)+'~'+md(inScope[inScope.length-1].to));
+  const iKrwVal=b.endKrw*sh, iKrwPrin=b.cap.krw*sh;
+  return {b:b, sh:sh, perNet:perNet, pLab:pLab,
+    iKrwVal:iKrwVal, iKrwPrin:iKrwPrin, iKrwPnl:iKrwVal-iKrwPrin};
+}
+function renderAlloc(){
+  const a=allocRows(), b=a.b, sh=a.sh;
+  $('allocChips').innerHTML=NAMES.map(n=>
+    '<button class="chip '+(book.allocInv===n?'on':'')+'" data-a="'+n+'" style="padding:6px 12px;font-size:12px">'+n+'</button>').join('');
+  document.querySelectorAll('#allocChips .chip').forEach(x=>x.onclick=()=>{
+    book.allocInv=x.dataset.a;
+    const o=book.inv[x.dataset.a];
+    if(o)book.allocShare=+((capital(o).krw/b.cap.krw)*100).toFixed(4);
+    saveCfg();renderAlloc();
+  });
+  $('allocShare').value=(book.allocShare==null?5:book.allocShare);
+
+  const cell=(t,v,strong)=>'<td>'+t+'</td><td style="font-weight:600'+(strong?';color:'+strong:'')+'">'+v+'</td>';
+  const pair=(l1,v1,l2,v2,c1,c2)=>'<tr>'+
+    '<td>'+l1+'</td><td style="font-weight:600'+(c1?';color:'+c1:'')+'">'+v1+'</td>'+
+    '<td>'+l2+'</td><td style="font-weight:600'+(c2?';color:'+c2:'')+'">'+v2+'</td></tr>';
+
+  let r='<tr><th style="width:22%">펀드</th><th style="width:28%"></th><th style="width:22%">투자자'+
+    (book.allocInv?' · '+book.allocInv:'')+'</th><th style="width:28%"></th></tr>';
+  r+=pair('납입원금 (누계)','₩'+num(b.cap.krw,0),'투자자 투자원금 (누계)','₩'+num(b.cap.krw*sh,0));
+  r+=pair('(USDT 환산 누계)','$'+num(b.cap.usd),'(USDT 환산 누계)','$'+num(b.cap.usd*sh));
+  r+=pair('투자자 지분율',num(sh*100)+'%','적용 환율 (가중평균 → 월말)',num(b.cap.wavg)+' → '+num(b.fx));
+  r+=pair('펀드 USD 손익 ('+a.pLab+' / 누적)',sgn(a.perNet)+'$'+num(a.perNet)+'  /  '+sgn(b.pnl)+'$'+num(b.pnl),
+          '투자자 USD 손익 ('+a.pLab+' / 누적)',sgn(a.perNet*sh)+'$'+num(a.perNet*sh)+'  /  '+sgn(b.pnl*sh)+'$'+num(b.pnl*sh),
+          col(b.pnl),col(b.pnl));
+  r+=pair('펀드 원화 손익',sgn(b.krwPnl)+'₩'+num(Math.abs(b.krwPnl),0),
+          '투자자 원화 손익',sgn(a.iKrwPnl)+'₩'+num(Math.abs(a.iKrwPnl),0),col(b.krwPnl),col(a.iKrwPnl));
+  r+='<tr class="tot">'+
+    '<td>월말 펀드 평가액</td><td style="font-weight:600">₩'+num(b.endKrw,0)+'</td>'+
+    '<td>월말 투자자 평가액</td><td style="font-weight:600">₩'+num(a.iKrwVal,0)+'</td></tr>';
+  $('atable').innerHTML=r;
+  $('allocFoot').textContent='지분율을 바꾸면 투자자 열 전체가 다시 계산됩니다. '+
+    '투자자 칩을 누르면 그 투자자의 납입원금이 펀드 납입원금에서 차지하는 비중으로 지분율이 채워집니다. '+
+    '다만 KWON 외에는 각자 별도 북으로 관리되고 있어 실제 손익이 이 비례 배분과 일치하지 않습니다 — 해당 투자자 탭의 숫자가 정본입니다.';
+}
+function allocText(){
+  const a=allocRows(), b=a.b, sh=a.sh;
+  const L=[
+    ['납입원금 (누계)','₩'+num(b.cap.krw,0),'투자자 투자원금 (누계)','₩'+num(b.cap.krw*sh,0)],
+    ['(USDT 환산 누계)','$'+num(b.cap.usd),'(USDT 환산 누계)','$'+num(b.cap.usd*sh)],
+    ['투자자 지분율',num(sh*100)+'%','적용 환율 (가중평균 → 월말)',num(b.cap.wavg)+' → '+num(b.fx)],
+    ['펀드 USD 손익',sgn(a.perNet)+'$'+num(a.perNet)+' / '+sgn(b.pnl)+'$'+num(b.pnl),
+     '투자자 USD 손익',sgn(a.perNet*sh)+'$'+num(a.perNet*sh)+' / '+sgn(b.pnl*sh)+'$'+num(b.pnl*sh)],
+    ['펀드 원화 손익',sgn(b.krwPnl)+'₩'+num(Math.abs(b.krwPnl),0),'투자자 원화 손익',sgn(a.iKrwPnl)+'₩'+num(Math.abs(a.iKrwPnl),0)],
+    ['월말 펀드 평가액','₩'+num(b.endKrw,0),'월말 투자자 평가액','₩'+num(a.iKrwVal,0)]
+  ];
+  return L.map(x=>x.join('\t')).join('\n');
+}
+
 /* ================= roster (ALL view) ================= */
 function renderRoster(){
   let rows='<tr><th>Investor</th><th>Since</th><th>원금 (KRW)</th><th>평균환율</th><th>원금 (USD)</th>'+
@@ -1003,6 +1083,7 @@ function boot(){
   const all=isAll();
   $('rosterPanel').style.display=all?'block':'none';
   ['inputPanel','capPanel','krwPanel','result'].forEach(id=>$(id).style.display=all?'none':'');
+  if(all)$('allocPanel').style.display='none';
   $('headBtns').style.display=all?'none':'flex';
   if(all){renderRoster();return;}
   renderContribs();build();
@@ -1039,6 +1120,16 @@ $('addCBtn').onclick=()=>{
   saveCfg();build();
 };
 $('endFx').addEventListener('change',()=>{collect();build();});
+$('allocShare').addEventListener('change',()=>{
+  const v=parseFloat($('allocShare').value);
+  if(!isNaN(v)&&v>=0){book.allocShare=v;book.allocInv=null;saveCfg();renderAlloc();}
+});
+$('allocCopy').onclick=()=>{
+  const t=allocText();
+  const done=()=>{const o=$('allocCopy');o.textContent='✓ Copied';setTimeout(()=>o.textContent='⧉ Copy as text',1500);};
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(done,()=>alert(t));
+  else alert(t);
+};
 document.querySelectorAll('.rb').forEach(b=>b.onclick=()=>{
   cfg.winDays=+b.dataset.d;saveCfg();build();
 });
